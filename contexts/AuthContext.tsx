@@ -1,20 +1,23 @@
 import { authService } from '@/services/authService';
-import { StoreData, storeService } from '@/services/storeService';
-import { LoginCredentials, User } from '@/types';
+import { storeService } from '@/services/storeService';
+import { LoginCredentials, StoreData, User } from '@/types';
 import { localStorage, secureStorage } from '@/utils/storage';
 import React, { createContext, ReactNode, useContext, useEffect, useState } from 'react';
-
 
 interface AuthContextData {
   user: User | null;
   token: string | null;
   storeData: StoreData | null;
+  allStores: StoreData[];           // NOVO: lista de todas as lojas do usuário
   isLoading: boolean;
   isAuthenticated: boolean;
   login: (credentials: LoginCredentials, rememberEmail?: boolean) => Promise<void>;
   logout: () => Promise<void>;
   refreshUserData: () => Promise<void>;
   refreshStoreData: () => Promise<void>;
+  switchStore: (storeId: string) => Promise<void>;
+  refreshAuthToken: () => Promise<boolean>;           // NOVO: refresh manual
+  ensureValidToken: () => Promise<boolean>;
 }
 
 const AuthContext = createContext<AuthContextData>({} as AuthContextData);
@@ -27,6 +30,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [storeData, setStoreData] = useState<StoreData | null>(null);
+  const [allStores, setAllStores] = useState<StoreData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   const isAuthenticated = !!user && !!token;
@@ -36,12 +40,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
     initializeAuth();
   }, []);
 
+  // ATUALIZAR: Modificar initializeAuth para tentar refresh
   const initializeAuth = async () => {
     try {
       console.log('[Auth Context] Inicializando autenticação...');
       setIsLoading(true);
 
-      // Tentar recuperar token e dados do usuário salvos
       const [savedToken, savedUser] = await Promise.all([
         secureStorage.getToken(),
         localStorage.getUserData(),
@@ -50,7 +54,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       if (savedToken && savedUser) {
         console.log('[Auth Context] Token e usuário encontrados no storage');
 
-        // Validar se o token ainda é válido
+        // Apenas validar token, sem tentar refresh automático
         const isTokenValid = await authService.validateToken(savedToken);
 
         if (isTokenValid) {
@@ -58,8 +62,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
           setToken(savedToken);
           setUser(savedUser);
 
-          // Carregar dados da loja em background
-          loadStoreData(savedToken);
+          // Tentar carregar lojas, mas não fazer refresh automático se falhar
+          try {
+            await loadStoresData(savedToken);
+          } catch (error) {
+            console.log('[Auth Context] Erro ao carregar lojas na inicialização (ignorando erro)');
+            // NÃO BLOQUEAR a inicialização se lojas falharem
+          }
         } else {
           console.log('[Auth Context] Token inválido, limpando dados');
           await clearAuthData();
@@ -75,15 +84,23 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   };
 
-  const loadStoreData = async (authToken: string) => {
+  const loadStoresData = async (authToken: string) => {
     try {
-      console.log('[Auth Context] Carregando dados da loja...');
-      const store = await storeService.getMyStore(authToken);
-      setStoreData(store);
-      console.log('[Auth Context] Dados da loja carregados:', store.name);
-    } catch (error) {
-      console.error('[Auth Context] Erro ao carregar dados da loja:', error);
-      // Não bloquear a autenticação se falhar ao carregar a loja
+      console.log('[Auth Context] Carregando dados das lojas...');
+
+      const stores = await storeService.getMyStores(authToken);
+      setAllStores(stores);
+
+      const primaryStore = stores.find(store => store.isActive) || stores[0];
+      if (primaryStore) {
+        setStoreData(primaryStore);
+        console.log('[Auth Context] Dados das lojas carregados. Loja principal:', primaryStore.name);
+      }
+    } catch (error: any) {
+      console.error('[Auth Context] Erro ao carregar dados das lojas:', error);
+
+      // APENAS LANÇA O ERRO - SEM RETRY AUTOMÁTICO
+      throw error;
     }
   };
 
@@ -112,8 +129,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
       setToken(newToken);
       setUser(userData);
 
-      // Carregar dados da loja em background
-      loadStoreData(newToken);
+      // Carregar dados das lojas em background
+      loadStoresData(newToken);
 
       console.log('[Auth Context] Login realizado com sucesso');
     } catch (error) {
@@ -124,20 +141,81 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   };
 
+  // NOVO: Método interno para fazer refresh
+  const performTokenRefresh = async (currentToken: string): Promise<boolean> => {
+    try {
+      console.log('[Auth Context] Executando refresh do token...');
+
+      const response = await authService.refreshToken(currentToken);
+
+      if (response.success && response.data) {
+        const { token: newToken, user: userData } = response.data;
+
+        // Atualizar token e dados
+        await Promise.all([
+          secureStorage.setToken(newToken),
+          localStorage.setUserData(userData),
+        ]);
+
+        setToken(newToken);
+        setUser(userData);
+
+        // REMOVER ESTA LINHA:
+        // await loadStoresData(newToken);
+
+        console.log('[Auth Context] Token atualizado com sucesso');
+        return true;
+      }
+
+      return false;
+    } catch (error) {
+      console.error('[Auth Context] Erro no refresh do token:', error);
+      return false;
+    }
+  };
+
+  // NOVO: Método público para refresh manual
+  const refreshAuthToken = async (): Promise<boolean> => {
+    if (!token) {
+      console.warn('[Auth Context] Não é possível fazer refresh sem token');
+      return false;
+    }
+
+    return await performTokenRefresh(token);
+  };
+  // NOVO: Garantir que o token é válido
+  const ensureValidToken = async (): Promise<boolean> => {
+    if (!token) {
+      console.warn('[Auth Context] Nenhum token disponível');
+      return false;
+    }
+
+    try {
+      // Testar se token atual funciona
+      const isValid = await authService.validateToken(token);
+
+      if (isValid) {
+        console.log('[Auth Context] Token atual é válido');
+        return true;
+      }
+
+      // Token inválido, tentar refresh
+      console.log('[Auth Context] Token inválido, tentando refresh...');
+      return await refreshAuthToken();
+
+    } catch (error) {
+      console.error('[Auth Context] Erro ao validar token:', error);
+      return false;
+    }
+  };
+
   const logout = async () => {
     try {
       console.log('[Auth Context] Iniciando logout...');
       setIsLoading(true);
 
-      // Tentar fazer logout no backend se há token
-      if (token) {
-        try {
-          await authService.logout(token);
-        } catch (error) {
-          console.warn('[Auth Context] Erro no logout do backend, continuando...');
-        }
-      }
-
+      // REMOVIDO: tentativa de logout no backend (endpoint não existe)
+      // Apenas limpar dados locais
       await clearAuthData();
       console.log('[Auth Context] Logout realizado');
     } catch (error) {
@@ -164,7 +242,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       setUser(userData);
 
       console.log('[Auth Context] Dados do usuário atualizados');
-    } catch (error) {
+    } catch (error: any) {
       console.error('[Auth Context] Erro ao atualizar dados do usuário:', error);
 
       // Se falhar ao buscar dados, pode ser que o token expirou
@@ -179,15 +257,33 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const refreshStoreData = async () => {
     if (!token) {
-      console.warn('[Auth Context] Não é possível atualizar dados da loja sem token');
+      console.warn('[Auth Context] Não é possível atualizar dados das lojas sem token');
       return;
     }
 
     try {
-      console.log('[Auth Context] Atualizando dados da loja...');
-      await loadStoreData(token);
+      console.log('[Auth Context] Atualizando dados das lojas...');
+      await loadStoresData(token); // SEM retry automático
     } catch (error) {
-      console.error('[Auth Context] Erro ao atualizar dados da loja:', error);
+      console.error('[Auth Context] Erro ao atualizar dados das lojas:', error);
+      throw error; // Lança erro para quem chamou decidir o que fazer
+    }
+  };
+
+  // NOVO: Método para trocar de loja
+  const switchStore = async (storeId: string) => {
+    try {
+      console.log('[Auth Context] Trocando para loja:', storeId);
+
+      const targetStore = allStores.find(store => store.id === storeId);
+      if (!targetStore) {
+        throw new Error('Loja não encontrada');
+      }
+
+      setStoreData(targetStore);
+      console.log('[Auth Context] Loja alterada para:', targetStore.name);
+    } catch (error) {
+      console.error('[Auth Context] Erro ao trocar de loja:', error);
       throw error;
     }
   };
@@ -196,6 +292,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     setToken(null);
     setUser(null);
     setStoreData(null);
+    setAllStores([]);
 
     await Promise.all([
       secureStorage.removeToken(),
@@ -207,12 +304,16 @@ export function AuthProvider({ children }: AuthProviderProps) {
     user,
     token,
     storeData,
+    allStores,
     isLoading,
     isAuthenticated,
     login,
     logout,
     refreshUserData,
     refreshStoreData,
+    switchStore,
+    refreshAuthToken,
+    ensureValidToken,
   };
 
   return (

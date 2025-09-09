@@ -282,6 +282,7 @@ export default function AddProductScreen() {
         );
     };
 
+    // CORRIGIDO: Método handleSave para usar storeSlug
     const handleSave = async () => {
         if (!validateForm() || !token || !storeData) {
             Alert.alert('Erro', 'Verifique os campos obrigatórios');
@@ -330,7 +331,8 @@ export default function AddProductScreen() {
                 },
             };
 
-            await productService.createProduct(storeData.id, productData, token);
+            // CORRIGIDO: Usar storeSlug em vez de storeId
+            await productService.createProduct(storeData.slug, productData, token);
 
             Alert.alert(
                 'Sucesso',

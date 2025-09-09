@@ -31,6 +31,11 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
         favicon: './assets/images/favicon.png',
         bundler: 'metro'
     },
+    extra: {
+        eas: {
+            projectId: "8b27bb60-82d8-42b4-9e2a-5ec04778150d"
+        },
+    },
     scheme: 'pvmo-mobile',
     plugins: [
         'expo-router'

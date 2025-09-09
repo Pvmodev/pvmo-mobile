@@ -1,3 +1,4 @@
+import { API_CONFIG } from '@/config/api';
 import { apiService } from './api';
 
 export interface ProductData {
@@ -45,144 +46,181 @@ export interface Product extends ProductData {
     updatedAt: Date;
 }
 
+// Interface para resposta da API
+interface ProductListResponse {
+    items: Product[];
+    total: number;
+    page: number;
+    totalPages: number;
+    collectionKey?: string;
+}
+
 class ProductService {
-    async createProduct(storeId: string, productData: ProductData, token: string): Promise<Product> {
-        console.log('🛍️ [Product Service] Criando produto para loja:', storeId);
+    // CORRIGIDO: Usar storeSlug em vez de storeId
+    async createProduct(storeSlug: string, productData: ProductData, token: string): Promise<Product> {
+        console.log('Criando produto para loja:', storeSlug);
 
         try {
-            const endpoint = `/stores/${storeId}/collections/items`;
+            const endpoint = API_CONFIG.ENDPOINTS.COLLECTIONS.CREATE_PLATFORM(storeSlug);
             const response = await apiService.post<Product>(endpoint, productData, token);
 
             if (!response.success || !response.data) {
                 throw new Error(response.message || 'Erro ao criar produto');
             }
 
-            console.log('✅ [Product Service] Produto criado com sucesso:', response.data.id);
+            console.log('Produto criado com sucesso:', response.data.id);
             return response.data;
         } catch (error) {
-            console.error('❌ [Product Service] Erro ao criar produto:', error);
+            console.error('Erro ao criar produto:', error);
             throw error;
         }
     }
 
-    async getProducts(storeId: string, collectionKey?: string, token?: string): Promise<Product[]> {
-        console.log('📋 [Product Service] Buscando produtos para loja:', storeId);
+    // CORRIGIDO: Usar nova estrutura de resposta da API
+    async getProducts(
+        storeSlug: string,
+        options: {
+            collectionKey?: string;
+            page?: number;
+            limit?: number;
+            isActive?: boolean;
+            featured?: boolean;
+            search?: string;
+        } = {},
+        token?: string
+    ): Promise<ProductListResponse> {
+        console.log('Buscando produtos para loja:', storeSlug);
 
         try {
-            let endpoint = `/stores/${storeId}/collections/items`;
-            if (collectionKey) {
-                endpoint += `?collection=${collectionKey}`;
+            const { page = 1, limit = 20, collectionKey, isActive, featured, search } = options;
+
+            // Construir query parameters
+            const queryParams = new URLSearchParams();
+            queryParams.append('page', page.toString());
+            queryParams.append('limit', limit.toString());
+
+            if (collectionKey) queryParams.append('collectionKey', collectionKey);
+            if (isActive !== undefined) queryParams.append('isActive', isActive.toString());
+            if (featured !== undefined) queryParams.append('featured', featured.toString());
+            if (search) queryParams.append('search', search);
+
+            let endpoint = API_CONFIG.ENDPOINTS.COLLECTIONS.ITEMS(storeSlug);
+            if (token) {
+                // Se tem token, usar endpoint administrativo que mostra todos os produtos
+                endpoint = API_CONFIG.ENDPOINTS.COLLECTIONS.ADMIN_ALL(storeSlug);
             }
 
-            const response = await apiService.get<Product[]>(endpoint, token);
+            endpoint += `?${queryParams.toString()}`;
+
+            const response = await apiService.get<ProductListResponse>(endpoint, token);
 
             if (!response.success || !response.data) {
                 throw new Error(response.message || 'Erro ao buscar produtos');
             }
 
-            console.log('✅ [Product Service] Produtos encontrados:', response.data.length);
+            console.log('Produtos encontrados:', response.data.total);
             return response.data;
         } catch (error) {
-            console.error('❌ [Product Service] Erro ao buscar produtos:', error);
+            console.error('Erro ao buscar produtos:', error);
             throw error;
         }
     }
 
-    async getProduct(storeId: string, productId: string, token?: string): Promise<Product> {
-        console.log('🔍 [Product Service] Buscando produto:', productId);
+    async getProduct(storeSlug: string, productId: string, token?: string): Promise<Product> {
+        console.log('Buscando produto:', productId);
 
         try {
-            const endpoint = `/stores/${storeId}/collections/items/${productId}`;
+            const endpoint = `${API_CONFIG.ENDPOINTS.COLLECTIONS.ITEMS(storeSlug)}/${productId}`;
             const response = await apiService.get<Product>(endpoint, token);
 
             if (!response.success || !response.data) {
                 throw new Error(response.message || 'Produto não encontrado');
             }
 
-            console.log('✅ [Product Service] Produto encontrado:', response.data.name);
+            console.log('Produto encontrado:', response.data.name);
             return response.data;
         } catch (error) {
-            console.error('❌ [Product Service] Erro ao buscar produto:', error);
+            console.error('Erro ao buscar produto:', error);
             throw error;
         }
     }
 
     async updateProduct(
-        storeId: string,
+        storeSlug: string,
         productId: string,
         productData: Partial<ProductData>,
         token: string
     ): Promise<Product> {
-        console.log('📝 [Product Service] Atualizando produto:', productId);
+        console.log('Atualizando produto:', productId);
 
         try {
-            const endpoint = `/stores/${storeId}/collections/items/${productId}`;
-            const response = await apiService.put<Product>(endpoint, productData, token);
+            const endpoint = `${API_CONFIG.ENDPOINTS.COLLECTIONS.CREATE_PLATFORM(storeSlug)}/${productId}`;
+            const response = await apiService.patch<Product>(endpoint, productData, token);
 
             if (!response.success || !response.data) {
                 throw new Error(response.message || 'Erro ao atualizar produto');
             }
 
-            console.log('✅ [Product Service] Produto atualizado com sucesso');
+            console.log('Produto atualizado com sucesso');
             return response.data;
         } catch (error) {
-            console.error('❌ [Product Service] Erro ao atualizar produto:', error);
+            console.error('Erro ao atualizar produto:', error);
             throw error;
         }
     }
 
-    async deleteProduct(storeId: string, productId: string, token: string): Promise<void> {
-        console.log('🗑️ [Product Service] Deletando produto:', productId);
+    async deleteProduct(storeSlug: string, productId: string, token: string): Promise<void> {
+        console.log('Deletando produto:', productId);
 
         try {
-            const endpoint = `/stores/${storeId}/collections/items/${productId}`;
+            const endpoint = `${API_CONFIG.ENDPOINTS.COLLECTIONS.CREATE_PLATFORM(storeSlug)}/${productId}`;
             const response = await apiService.delete(endpoint, token);
 
             if (!response.success) {
                 throw new Error(response.message || 'Erro ao deletar produto');
             }
 
-            console.log('✅ [Product Service] Produto deletado com sucesso');
+            console.log('Produto deletado com sucesso');
         } catch (error) {
-            console.error('❌ [Product Service] Erro ao deletar produto:', error);
+            console.error('Erro ao deletar produto:', error);
             throw error;
         }
     }
 
     async toggleProductStatus(
-        storeId: string,
+        storeSlug: string,
         productId: string,
         isActive: boolean,
         token: string
     ): Promise<Product> {
-        console.log('🔄 [Product Service] Alterando status do produto:', productId, isActive);
+        console.log('Alterando status do produto:', productId, isActive);
 
         try {
-            return await this.updateProduct(storeId, productId, { isActive }, token);
+            return await this.updateProduct(storeSlug, productId, { isActive }, token);
         } catch (error) {
-            console.error('❌ [Product Service] Erro ao alterar status:', error);
+            console.error('Erro ao alterar status:', error);
             throw error;
         }
     }
 
     async toggleFeaturedStatus(
-        storeId: string,
+        storeSlug: string,
         productId: string,
         featured: boolean,
         token: string
     ): Promise<Product> {
-        console.log('⭐ [Product Service] Alterando destaque do produto:', productId, featured);
+        console.log('Alterando destaque do produto:', productId, featured);
 
         try {
-            return await this.updateProduct(storeId, productId, { featured }, token);
+            return await this.updateProduct(storeSlug, productId, { featured }, token);
         } catch (error) {
-            console.error('❌ [Product Service] Erro ao alterar destaque:', error);
+            console.error('Erro ao alterar destaque:', error);
             throw error;
         }
     }
 
     async updateProductStock(
-        storeId: string,
+        storeSlug: string,
         productId: string,
         stockData: {
             storageP?: number;
@@ -196,18 +234,18 @@ class ProductService {
         },
         token: string
     ): Promise<Product> {
-        console.log('📦 [Product Service] Atualizando estoque do produto:', productId);
+        console.log('Atualizando estoque do produto:', productId);
 
         try {
-            return await this.updateProduct(storeId, productId, stockData, token);
+            return await this.updateProduct(storeSlug, productId, stockData, token);
         } catch (error) {
-            console.error('❌ [Product Service] Erro ao atualizar estoque:', error);
+            console.error('Erro ao atualizar estoque:', error);
             throw error;
         }
     }
 
     async searchProducts(
-        storeId: string,
+        storeSlug: string,
         searchTerm: string,
         filters?: {
             collectionKey?: string;
@@ -219,38 +257,48 @@ class ProductService {
         },
         token?: string
     ): Promise<Product[]> {
-        console.log('🔎 [Product Service] Pesquisando produtos:', searchTerm);
+        console.log('Pesquisando produtos:', searchTerm);
 
         try {
-            let endpoint = `/stores/${storeId}/collections/items/search?q=${encodeURIComponent(searchTerm)}`;
+            const response = await this.getProducts(
+                storeSlug,
+                {
+                    search: searchTerm,
+                    collectionKey: filters?.collectionKey,
+                    isActive: filters?.isActive,
+                    featured: filters?.featured,
+                },
+                token
+            );
 
-            if (filters) {
-                Object.entries(filters).forEach(([key, value]) => {
-                    if (value !== undefined && value !== null) {
-                        if (Array.isArray(value)) {
-                            endpoint += `&${key}=${value.join(',')}`;
-                        } else {
-                            endpoint += `&${key}=${value}`;
-                        }
-                    }
-                });
+            let products = response.items;
+
+            // Aplicar filtros adicionais que a API não suporta
+            if (filters?.minPrice !== undefined) {
+                products = products.filter(p => p.price >= filters.minPrice!);
+            }
+            if (filters?.maxPrice !== undefined) {
+                products = products.filter(p => p.price <= filters.maxPrice!);
+            }
+            if (filters?.tags && filters.tags.length > 0) {
+                products = products.filter(p =>
+                    filters.tags!.some(tag =>
+                        p.tag.some(productTag =>
+                            productTag.toLowerCase().includes(tag.toLowerCase())
+                        )
+                    )
+                );
             }
 
-            const response = await apiService.get<Product[]>(endpoint, token);
-
-            if (!response.success || !response.data) {
-                throw new Error(response.message || 'Erro na pesquisa');
-            }
-
-            console.log('✅ [Product Service] Produtos encontrados na pesquisa:', response.data.length);
-            return response.data;
+            console.log('Produtos encontrados na pesquisa:', products.length);
+            return products;
         } catch (error) {
-            console.error('❌ [Product Service] Erro na pesquisa:', error);
+            console.error('Erro na pesquisa:', error);
             throw error;
         }
     }
 
-    // Utilitários para formatação
+    // Utilitários para formatação (mantidos)
     formatPrice(price: number): string {
         return new Intl.NumberFormat('pt-BR', {
             style: 'currency',

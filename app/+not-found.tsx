@@ -7,7 +7,7 @@ export default function NotFoundScreen() {
   return (
     <>
       <View>
-        <Text>Not found</Text>
+        <Text>Not found!!!!!!</Text>
       </View>
     </>
   );

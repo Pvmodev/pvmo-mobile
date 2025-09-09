@@ -211,9 +211,13 @@ export default function DashboardScreen() {
         );
     };
 
-    const handleStoreManagement = () => {
+    const handleMyStoreManagement = () => {
         router.navigate("/store-dashboard")
     };
+
+    const handleStoresManagement = () => {
+        router.navigate("/store-management")
+    }
 
     const handleUserManagement = () => {
         Alert.alert('Em desenvolvimento', 'Funcionalidade de gerenciamento de usuários em desenvolvimento');
@@ -329,13 +333,13 @@ export default function DashboardScreen() {
                     <View style={styles.menuContainer}>
                         <Text style={styles.menuTitle}>Menu Principal</Text>
 
-                        {user.role === 'pvmo_admin' && (
+                        {user.role === 'PVMO_ADMIN' && (
                             <>
                                 <MenuOption
                                     icon="storefront-outline"
                                     title="Gerenciar Lojas"
                                     subtitle="Visualizar e gerenciar todas as lojas"
-                                    onPress={handleStoreManagement}
+                                    onPress={handleStoresManagement}
                                     color="#667eea"
                                     index={0}
                                 />
@@ -350,16 +354,14 @@ export default function DashboardScreen() {
                             </>
                         )}
 
-                        {(user.role === 'store_client' || user.role === 'employee') && (
-                            <MenuOption
-                                icon="storefront-outline"
-                                title="Minha Loja"
-                                subtitle="Gerenciar produtos e vendas"
-                                onPress={handleStoreManagement}
-                                color="#667eea"
-                                index={0}
-                            />
-                        )}
+                        <MenuOption
+                            icon="storefront-outline"
+                            title="Minha Loja"
+                            subtitle="Gerenciar produtos e vendas"
+                            onPress={handleMyStoreManagement}
+                            color="#667eea"
+                            index={0}
+                        />
 
                         <MenuOption
                             icon="analytics-outline"
@@ -367,7 +369,7 @@ export default function DashboardScreen() {
                             subtitle="Relatórios e estatísticas"
                             onPress={handleAnalytics}
                             color="#FF9800"
-                            index={user.role === 'pvmo_admin' ? 2 : 1}
+                            index={user.role === 'PVMO_ADMIN' ? 2 : 1}
                         />
 
                         <MenuOption
@@ -376,7 +378,7 @@ export default function DashboardScreen() {
                             subtitle="Gerenciar informações pessoais"
                             onPress={handleProfile}
                             color="#9C27B0"
-                            index={user.role === 'pvmo_admin' ? 3 : 2}
+                            index={user.role === 'PVMO_ADMIN' ? 3 : 2}
                         />
 
                         <MenuOption
@@ -385,7 +387,7 @@ export default function DashboardScreen() {
                             subtitle="Preferências e configurações"
                             onPress={handleSettings}
                             color="#607D8B"
-                            index={user.role === 'pvmo_admin' ? 4 : 3}
+                            index={user.role === 'PVMO_ADMIN' ? 4 : 3}
                         />
                     </View>
 

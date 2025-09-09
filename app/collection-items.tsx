@@ -1,5 +1,5 @@
 import { useAuth } from '@/contexts/AuthContext';
-import { Product } from '@/services/productService';
+import { Product, productService } from '@/services/productService';
 import { storeService } from '@/services/storeService';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -280,6 +280,7 @@ export default function CollectionItemsScreen() {
         }
     };
 
+    // CORRIGIDO: Método loadProducts para usar nova API
     const loadProducts = async (reset = false, searchTerm = searchText, currentFilters = filters) => {
         if (!storeData || !token) return;
 
@@ -294,43 +295,21 @@ export default function CollectionItemsScreen() {
 
             const page = reset ? 1 : currentPage + 1;
 
-            // Build query parameters
-            const queryParams = new URLSearchParams();
-            queryParams.append('limit', itemsPerPage.toString());
-            queryParams.append('page', page.toString());
-
-            // Add collectionKey filter
-            if (params.collectionKey) {
-                queryParams.append('collectionKey', params.collectionKey);
-            }
-
-            if (searchTerm) {
-                queryParams.append('search', searchTerm);
-            }
-
-            if (currentFilters.isActive !== undefined) {
-                queryParams.append('isActive', currentFilters.isActive.toString());
-            }
-
-            if (currentFilters.featured !== undefined) {
-                queryParams.append('featured', currentFilters.featured.toString());
-            }
-
-            const endpoint = `/stores/${storeData.id}/collections/items?${queryParams.toString()}`;
-            const response = await fetch(`https://pvmo-api-production.up.railway.app${endpoint}`, {
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json',
+            // CORRIGIDO: Usar novo productService
+            const response = await productService.getProducts(
+                storeData.slug, // Usar slug em vez de ID
+                {
+                    page,
+                    limit: itemsPerPage,
+                    collectionKey: params.collectionKey,
+                    search: searchTerm,
+                    isActive: currentFilters.isActive,
+                    featured: currentFilters.featured,
                 },
-            });
+                token
+            );
 
-            const data: ApiResponse = await response.json();
-
-            if (!response.ok || !data.success) {
-                throw new Error('Erro ao carregar produtos');
-            }
-
-            const newProducts = data.data.items || [];
+            const newProducts = response.items || [];
 
             if (reset) {
                 setProducts(newProducts);
@@ -341,8 +320,8 @@ export default function CollectionItemsScreen() {
             }
 
             // Update pagination info
-            setTotalPages(data.data.totalPages || 1);
-            setTotal(data.data.total || 0);
+            setTotalPages(response.totalPages || 1);
+            setTotal(response.total || 0);
 
         } catch (error: any) {
             console.error('Erro ao carregar produtos:', error);
