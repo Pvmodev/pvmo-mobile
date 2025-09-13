@@ -17,7 +17,28 @@ import {
     View,
 } from 'react-native';
 
+// Interface para os dados da coleção vindos do serviço
+interface Collection {
+    key: string;
+    displayName: string;
+    icon: string;
+    description?: string;
+    isActive: boolean;
+    productCount?: number;
+    // Adicione outras propriedades conforme necessário
+}
 
+// Interface esperada pelo componente CollectionItem
+interface CollectionInfo {
+    key: string;
+    name: string;
+    displayName: string;
+    icon: string;
+    category: string;
+    description?: string;
+    isActive: boolean;
+    productCount?: number;
+}
 
 export default function StoreDashboardScreen() {
     const { user, token, storeData, refreshStoreData } = useAuth();
@@ -76,10 +97,20 @@ export default function StoreDashboardScreen() {
     };
 
     const handleToggleCollection = async (collectionKey: string, currentStatus: boolean) => {
-        if (!token || !storeData) return;
+        if (!token || !storeData || !storeData.id) {
+            Alert.alert('Erro', 'Dados da loja não disponíveis');
+            return;
+        }
 
         try {
-            await storeService.toggleCollection(collectionKey, !currentStatus, token);
+            console.log('Toggle collection:', {
+                collectionKey,
+                currentStatus,
+                newStatus: !currentStatus,
+                storeId: storeData.id
+            });
+
+            await storeService.toggleCollection(collectionKey, !currentStatus, token, storeData.id);
             await refreshStoreData();
 
             Alert.alert(
@@ -87,6 +118,7 @@ export default function StoreDashboardScreen() {
                 `Coleção ${!currentStatus ? 'ativada' : 'desativada'} com sucesso!`
             );
         } catch (error: any) {
+            console.error('Erro ao alterar coleção:', error);
             Alert.alert('Erro', error.message || 'Não foi possível alterar o status da coleção');
         }
     };
@@ -103,7 +135,50 @@ export default function StoreDashboardScreen() {
         router.push(`/add-product?collectionKey=${collectionKey}`);
     };
 
+    // Função para mapear Collection para CollectionInfo
+    const mapCollectionToCollectionInfo = (collection: Collection): CollectionInfo => {
+        // Mapeamento de ícones para categorias
+        const getCategoryFromIcon = (icon: string): string => {
+            const categoryMap: { [key: string]: string } = {
+                'bikini': 'Moda Praia',
+                'swimwear': 'Moda Praia',
+                'swimsuit': 'Moda Praia',
+                'beachwear': 'Moda Praia',
+                'accessories': 'Acessórios',
+                'watch': 'Acessórios',
+                'bags': 'Acessórios',
+                'clothing': 'Vestuário',
+                'shirt': 'Vestuário',
+                'tshirts': 'Vestuário',
+                'shirts': 'Vestuário',
+                'blouses': 'Vestuário',
+                'pants': 'Vestuário',
+                'jeans': 'Vestuário',
+                'shorts': 'Vestuário',
+                'fitness': 'Fitness',
+                'shoes': 'Calçados',
+                'sneakers': 'Calçados',
+                'underwear': 'Íntimos',
+                'lingerie': 'Íntimos',
+                'kids': 'Infantil',
+                'men': 'Masculino',
+                'default': 'Geral'
+            };
 
+            return categoryMap[icon] || categoryMap['default'];
+        };
+
+        return {
+            key: collection.key,
+            name: collection.displayName, // Usar displayName como name
+            displayName: collection.displayName,
+            icon: collection.icon,
+            category: getCategoryFromIcon(collection.icon),
+            description: collection.description,
+            isActive: collection.isActive,
+            productCount: collection.productCount,
+        };
+    };
 
     if (!storeData) {
         return (
@@ -121,6 +196,8 @@ export default function StoreDashboardScreen() {
     }
 
     const collections = storeService.getCollectionsInfo(storeData);
+    // Mapear as coleções para o formato esperado pelo componente
+    const mappedCollections = collections.map(mapCollectionToCollectionInfo);
 
     return (
         <View style={styles.container}>
@@ -200,11 +277,8 @@ export default function StoreDashboardScreen() {
                 {/* Collections List */}
                 <View style={styles.collectionsSection}>
                     <Text style={styles.sectionTitle}>Coleções Disponíveis</Text>
-                    {/* <Button onPress={() => router.navigate("/collection-items-screen.tsx")}>
-                        Pesquisar itens
-                    </Button> */}
                     <FlatList
-                        data={collections}
+                        data={mappedCollections}
                         renderItem={({ item }) => (
                             <CollectionItem
                                 item={item}
@@ -376,74 +450,5 @@ const styles = StyleSheet.create({
     },
     separator: {
         height: 12,
-    },
-    collectionCard: {
-        borderRadius: 12,
-        overflow: 'hidden',
-    },
-    collectionGradient: {
-        borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.2)',
-        padding: 16,
-    },
-    collectionHeader: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginBottom: 12,
-    },
-    collectionIconContainer: {
-        width: 48,
-        height: 48,
-        borderRadius: 24,
-        backgroundColor: 'rgba(255,255,255,0.1)',
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginRight: 12,
-    },
-    collectionInfo: {
-        flex: 1,
-    },
-    collectionName: {
-        fontSize: 16,
-        fontWeight: '600',
-        color: 'white',
-        marginBottom: 2,
-    },
-    collectionDescription: {
-        fontSize: 13,
-        color: 'rgba(255,255,255,0.6)',
-    },
-    collectionActions: {
-        alignItems: 'flex-end',
-    },
-    statusBadge: {
-        paddingHorizontal: 8,
-        paddingVertical: 4,
-        borderRadius: 8,
-        minWidth: 60,
-        alignItems: 'center',
-    },
-    statusText: {
-        fontSize: 11,
-        color: 'white',
-        fontWeight: '600',
-        textTransform: 'uppercase',
-    },
-    collectionFooter: {
-        flexDirection: 'row',
-        gap: 8,
-    },
-    actionButton: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingHorizontal: 12,
-        paddingVertical: 8,
-        borderRadius: 8,
-        gap: 4,
-    },
-    actionButtonText: {
-        fontSize: 12,
-        color: 'white',
-        fontWeight: '600',
     },
 });

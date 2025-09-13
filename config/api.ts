@@ -1,19 +1,37 @@
+// src/config/api.ts - CORRIGIDO BASEADO NOS ENDPOINTS REAIS
+
 // Configuração da API
 export const API_CONFIG = {
     BASE_URL: __DEV__
-        ? 'http://192.168.0.3:3333' // URL para desenvolvimento (ajuste pelo seu IP)
-        : 'https://pvmo-api-production.up.railway.app', // URL para produção
+        ? process.env.EXPO_PUBLIC_API_URL || 'http://192.168.0.3:3333'
+        : 'https://pvmo-api-production.up.railway.app',
 
     ENDPOINTS: {
-        AUTH: {
+        // === TENANT/ADMIN ===
+        TENANT: {
+            LIST_SCHEMAS: '/admin/tenants/schemas',
+            CREATE_SCHEMA: (storeId: string) => `/admin/tenants/${storeId}/create-schema`
+        },
+
+        // === PLATFORM AUTHENTICATION ===
+        PLATFORM_AUTH: {
             LOGIN: '/platform/auth/login',
             ME: '/platform/auth/me',
-            REFRESH: '/platform/auth/refresh',                    // NOVO: refresh token
-            GRANT_ACCESS: '/platform/auth/grant-store-access'
-        }, // GESTÃO DE USUÁRIOS DA PLATAFORMA
+            GRANT_STORE_ACCESS: '/platform/auth/grant-store-access',
+            REFRESH: '/platform/auth/refresh'
+        },
+
+        // === STORE AUTHENTICATION ===
+        STORE_AUTH: {
+            LOGIN: (storeSlug: string) => `/stores/${storeSlug}/auth/login`,
+            REGISTER: (storeSlug: string) => `/stores/${storeSlug}/auth/register`,
+            ME: (storeSlug: string) => `/stores/${storeSlug}/auth/me`
+        },
+
+        // === PLATFORM USERS ===
         PLATFORM_USERS: {
-            LIST: '/platform/users',
             CREATE: '/platform/users',
+            LIST: '/platform/users',
             GET_BY_ID: (userId: string) => `/platform/users/${userId}`,
             UPDATE: (userId: string) => `/platform/users/${userId}`,
             DELETE: (userId: string) => `/platform/users/${userId}`,
@@ -23,61 +41,53 @@ export const API_CONFIG = {
                 `/platform/users/${userId}/stores/${storeId}/access`,
             GET_STORE_ACCESS: (userId: string) => `/platform/users/${userId}/stores`
         },
+
+        // === STORES ===
         STORES: {
-            LIST: '/stores',
             CREATE: '/stores',
-            CREATE_WITH_OWNER: '/stores/with-owner',
+            LIST: '/stores',
             MY_STORES: '/stores/my-stores',
             GET_BY_ID: (storeId: string) => `/stores/${storeId}`,
             UPDATE: (storeId: string) => `/stores/${storeId}`,
+            DELETE: (storeId: string) => `/stores/${storeId}`,
             UPDATE_COLLECTIONS: (storeId: string) => `/stores/${storeId}/collections`,
             TOGGLE_ACTIVE: (storeId: string) => `/stores/${storeId}/toggle-active`,
-            DETAILS: '/stores',
-            COLLECTIONS: (storeSlug: string) => `/stores/${storeSlug}/collections`,
-            DELETE: (storeId: string) => `/stores/${storeId}`
-
+            CREATE_WITH_OWNER: '/stores/with-owner'
         },
+
+        // === COLLECTIONS (BASEADO NO QUE FOI MOSTRADO ANTERIORMENTE) ===
         COLLECTIONS: {
-            // Rotas públicas (sem auth)
+            // Rotas públicas da loja
             ITEMS: (storeSlug: string) => `/stores/${storeSlug}/collections`,
             ITEM_GET: (storeSlug: string, itemId: string) =>
                 `/stores/${storeSlug}/collections/${itemId}`,
 
-            // Rotas administrativas (plataforma)
+            // Rotas administrativas da plataforma
             ADMIN_ALL: (storeSlug: string) => `/stores/${storeSlug}/collections/admin/all`,
             CREATE_PLATFORM: (storeSlug: string) => `/stores/${storeSlug}/collections`,
-            CREATE_STORE: (storeSlug: string) => `/stores/${storeSlug}/collections/store-admin`,
-            COLLECTION_UPDATE: (storeSlug: string, itemId: string) => `/stores/${storeSlug}/collections/${itemId}`,
-            COLLECTION_DELETE: (storeSlug: string, itemId: string) => `/stores/${storeSlug}/collections/${itemId}`,
+            UPDATE_PLATFORM: (storeSlug: string, itemId: string) =>
+                `/stores/${storeSlug}/collections/${itemId}`,
+            DELETE_PLATFORM: (storeSlug: string, itemId: string) =>
+                `/stores/${storeSlug}/collections/${itemId}`,
 
             // Rotas da loja (store admin)
-            STORE_CREATE: (storeSlug: string) => `/stores/${storeSlug}/collections/store-admin`,
-            STORE_UPDATE: (storeSlug: string, itemId: string) => `/stores/${storeSlug}/collections/store-admin/${itemId}`,
-            STORE_DELETE: (storeSlug: string, itemId: string) => `/stores/${storeSlug}/collections/store-admin/${itemId}`
+            CREATE_STORE: (storeSlug: string) => `/stores/${storeSlug}/collections/store-admin`,
+            UPDATE_STORE: (storeSlug: string, itemId: string) =>
+                `/stores/${storeSlug}/collections/store-admin/${itemId}`,
+            DELETE_STORE: (storeSlug: string, itemId: string) =>
+                `/stores/${storeSlug}/collections/store-admin/${itemId}`
+        },
 
-        },
-        // AUTENTICAÇÃO DE USUÁRIOS DE LOJAS
-        STORE_AUTH: {
-            LOGIN: (storeSlug: string) => `/stores/${storeSlug}/auth/login`,
-            REGISTER: (storeSlug: string) => `/stores/${storeSlug}/auth/register`,
-            ME: (storeSlug: string) => `/stores/${storeSlug}/auth/me`
-        },
-        TENANT: {
-            LIST_SCHEMAS: '/admin/tenants/schemas',
-            CREATE_SCHEMA: (storeId: string) => `/admin/tenants/${storeId}/create-schema`
-        },
-        // HEALTH CHECK
+        // === HEALTH CHECK ===
         HEALTH: '/health'
     },
 
-    // Headers padrão
     DEFAULT_HEADERS: {
         'Content-Type': 'application/json',
         'Accept': 'application/json'
     },
 
-    // Timeout para requisições (em ms)
-    TIMEOUT: 10000
+    TIMEOUT: 30000
 };
 
 // Função para obter a URL completa do endpoint

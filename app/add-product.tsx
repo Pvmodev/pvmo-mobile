@@ -1,6 +1,8 @@
 import { useAuth } from '@/contexts/AuthContext';
-import { ProductData, productService } from '@/services/productService';
+import { productService } from '@/services/productService';
 import { storeService } from '@/services/storeService';
+import { ProductData } from '@/types';
+import { PriceHelper } from '@/utils/priceHelper';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -20,7 +22,6 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
-
 const { width: screenWidth } = Dimensions.get('window');
 
 interface ProductForm {
@@ -282,6 +283,8 @@ export default function AddProductScreen() {
         );
     };
 
+
+
     // CORRIGIDO: Método handleSave para usar storeSlug
     const handleSave = async () => {
         if (!validateForm() || !token || !storeData) {
@@ -314,7 +317,7 @@ export default function AddProductScreen() {
                 storageGG: formData.storageGG,
                 storageEXG: formData.storageEXG,
                 storageLocation: formData.storageLocation,
-                price: formData.price,
+                price: PriceHelper.toCents(formData.price),
                 discount: formData.discount,
                 featured: formData.featured,
                 isActive: formData.isActive,

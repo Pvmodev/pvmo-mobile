@@ -26,7 +26,7 @@ interface CreateClientForm {
     email: string;
     password: string;
     confirmPassword: string;
-    role: 'STORE_OWNER' | 'STORE_EMPLOYEE' | 'DEFAULT_USER';
+    role: 'PVMO_ADMIN' | 'PLATFORM_USER';
 }
 
 export default function CreateClientScreen() {
@@ -38,7 +38,7 @@ export default function CreateClientScreen() {
         email: '',
         password: '',
         confirmPassword: '',
-        role: 'DEFAULT_USER'
+        role: 'PLATFORM_USER'
     });
 
     const [isLoading, setIsLoading] = useState(false);
@@ -130,9 +130,8 @@ export default function CreateClientScreen() {
     };
 
     const roleOptions = [
-        { value: 'DEFAULT_USER', label: 'Usuário Padrão', description: 'Acesso básico ao sistema' },
-        { value: 'STORE_EMPLOYEE', label: 'Funcionário', description: 'Pode gerenciar lojas designadas' },
-        { value: 'STORE_OWNER', label: 'Proprietário', description: 'Pode criar e gerenciar suas lojas' }
+        { value: 'PVMO_ADMIN', label: 'Admin da Plataforma', description: 'Gerenciador de Todo o siatema' },
+        { value: 'PLATFORM_USER', label: 'Proprietário', description: 'Pode criar e gerenciar suas lojas e funcionários' }
     ];
 
     return (

@@ -333,26 +333,24 @@ export default function DashboardScreen() {
                     <View style={styles.menuContainer}>
                         <Text style={styles.menuTitle}>Menu Principal</Text>
 
-                        {user.role === 'PVMO_ADMIN' && (
-                            <>
-                                <MenuOption
-                                    icon="storefront-outline"
-                                    title="Gerenciar Lojas"
-                                    subtitle="Visualizar e gerenciar todas as lojas"
-                                    onPress={handleStoresManagement}
-                                    color="#667eea"
-                                    index={0}
-                                />
-                                <MenuOption
-                                    icon="people-outline"
-                                    title="Gerenciar Usuários"
-                                    subtitle="Administrar usuários do sistema"
-                                    onPress={handleUserManagement}
-                                    color="#4CAF50"
-                                    index={1}
-                                />
-                            </>
-                        )}
+                        <>
+                            <MenuOption
+                                icon="storefront-outline"
+                                title="Gerenciar Lojas"
+                                subtitle="Visualizar e gerenciar todas as lojas"
+                                onPress={handleStoresManagement}
+                                color="#667eea"
+                                index={0}
+                            />
+                            <MenuOption
+                                icon="people-outline"
+                                title="Gerenciar Usuários"
+                                subtitle="Administrar usuários do sistema"
+                                onPress={handleUserManagement}
+                                color="#4CAF50"
+                                index={1}
+                            />
+                        </>
 
                         <MenuOption
                             icon="storefront-outline"

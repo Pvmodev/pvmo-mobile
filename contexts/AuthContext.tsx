@@ -1,6 +1,13 @@
+// src/contexts/AuthContext.tsx - CORREÇÃO COMPLETA
+
 import { authService } from '@/services/authService';
 import { storeService } from '@/services/storeService';
-import { LoginCredentials, StoreData, User } from '@/types';
+import {
+  LoginCredentials,
+  PlatformUserRole,
+  StoreData,
+  User
+} from '@/types';
 import { localStorage, secureStorage } from '@/utils/storage';
 import React, { createContext, ReactNode, useContext, useEffect, useState } from 'react';
 
@@ -8,7 +15,7 @@ interface AuthContextData {
   user: User | null;
   token: string | null;
   storeData: StoreData | null;
-  allStores: StoreData[];           // NOVO: lista de todas as lojas do usuário
+  allStores: StoreData[];
   isLoading: boolean;
   isAuthenticated: boolean;
   login: (credentials: LoginCredentials, rememberEmail?: boolean) => Promise<void>;
@@ -16,8 +23,11 @@ interface AuthContextData {
   refreshUserData: () => Promise<void>;
   refreshStoreData: () => Promise<void>;
   switchStore: (storeId: string) => Promise<void>;
-  refreshAuthToken: () => Promise<boolean>;           // NOVO: refresh manual
+  refreshAuthToken: () => Promise<boolean>;
   ensureValidToken: () => Promise<boolean>;
+  // ✅ EXPORTAR as funções utilitárias
+  canAccessStore: (storeSlug: string) => boolean;
+  canManageStore: (storeSlug: string) => boolean;
 }
 
 const AuthContext = createContext<AuthContextData>({} as AuthContextData);
@@ -35,12 +45,57 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const isAuthenticated = !!user && !!token;
 
+  // ✅ CORRIGIR: Funções utilitárias com tipos corretos
+  const canAccessStore = (storeSlug: string): boolean => {
+    if (!user) return false;
+
+    // PVMO_ADMIN pode acessar qualquer loja
+    if (user.role === PlatformUserRole.PVMO_ADMIN) {
+      return true;
+    }
+
+    // Verificar se tem acesso específico à loja
+    return user.stores.some(store =>
+      store.storeSlug === storeSlug &&
+      store.isActive
+    );
+  };
+
+  const canManageStore = (storeSlug: string): boolean => {
+    if (!user) return false;
+
+    if (user.role === PlatformUserRole.PVMO_ADMIN) {
+      return true;
+    }
+
+    const storeAccess = user.stores.find(store =>
+      store.storeSlug === storeSlug && store.isActive
+    );
+
+    if (!storeAccess) return false;
+
+    // ✅ CORRIGIR: Usar valores literais em vez do enum para comparação
+    const ownerRoles: string[] = ['OWNER', 'MANAGER'];
+
+    // OWNER e MANAGER sempre podem gerenciar
+    if (ownerRoles.includes(storeAccess.storeRole)) {
+      return true;
+    }
+
+    // EMPLOYEE pode gerenciar se tiver permissão específica
+    if (storeAccess.storeRole === 'EMPLOYEE') {
+      return storeAccess.permissions.canManageProducts ||
+        storeAccess.permissions.canManageUsers;
+    }
+
+    return false;
+  };
+
   // Inicialização - verificar se há token salvo
   useEffect(() => {
     initializeAuth();
   }, []);
 
-  // ATUALIZAR: Modificar initializeAuth para tentar refresh
   const initializeAuth = async () => {
     try {
       console.log('[Auth Context] Inicializando autenticação...');
@@ -54,7 +109,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
       if (savedToken && savedUser) {
         console.log('[Auth Context] Token e usuário encontrados no storage');
 
-        // Apenas validar token, sem tentar refresh automático
         const isTokenValid = await authService.validateToken(savedToken);
 
         if (isTokenValid) {
@@ -62,12 +116,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
           setToken(savedToken);
           setUser(savedUser);
 
-          // Tentar carregar lojas, mas não fazer refresh automático se falhar
           try {
             await loadStoresData(savedToken);
           } catch (error) {
             console.log('[Auth Context] Erro ao carregar lojas na inicialização (ignorando erro)');
-            // NÃO BLOQUEAR a inicialização se lojas falharem
           }
         } else {
           console.log('[Auth Context] Token inválido, limpando dados');
@@ -98,8 +150,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
       }
     } catch (error: any) {
       console.error('[Auth Context] Erro ao carregar dados das lojas:', error);
-
-      // APENAS LANÇA O ERRO - SEM RETRY AUTOMÁTICO
       throw error;
     }
   };
@@ -117,7 +167,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
       const { token: newToken, user: userData } = response.data;
 
-      // Salvar token e dados do usuário
       await Promise.all([
         secureStorage.setToken(newToken),
         localStorage.setUserData(userData),
@@ -129,7 +178,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
       setToken(newToken);
       setUser(userData);
 
-      // Carregar dados das lojas em background
       loadStoresData(newToken);
 
       console.log('[Auth Context] Login realizado com sucesso');
@@ -141,17 +189,29 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   };
 
-  // NOVO: Método interno para fazer refresh
   const performTokenRefresh = async (currentToken: string): Promise<boolean> => {
     try {
       console.log('[Auth Context] Executando refresh do token...');
 
       const response = await authService.refreshToken(currentToken);
 
-      if (response.success && response.data) {
-        const { token: newToken, user: userData } = response.data;
+      // Verificação defensiva para ambos os tipos de resposta
+      let tokenData: { token: string; user: User } | null = null;
 
-        // Atualizar token e dados
+      // Se for ApiResponse<RefreshResponse>
+      if (response && typeof response === 'object' && 'success' in response) {
+        if (response.success && response.data) {
+          tokenData = response.data;
+        }
+      }
+      // Se for RefreshResponse direta
+      else if (response && typeof response === 'object' && 'token' in response && 'user' in response) {
+        tokenData = response as any;
+      }
+
+      if (tokenData) {
+        const { token: newToken, user: userData } = tokenData;
+
         await Promise.all([
           secureStorage.setToken(newToken),
           localStorage.setUserData(userData),
@@ -160,8 +220,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
         setToken(newToken);
         setUser(userData);
 
-        // REMOVER ESTA LINHA:
-        // await loadStoresData(newToken);
+        try {
+          await loadStoresData(newToken);
+        } catch (error) {
+          console.warn('[Auth Context] Erro ao recarregar lojas após refresh (ignorando)');
+        }
 
         console.log('[Auth Context] Token atualizado com sucesso');
         return true;
@@ -174,7 +237,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   };
 
-  // NOVO: Método público para refresh manual
   const refreshAuthToken = async (): Promise<boolean> => {
     if (!token) {
       console.warn('[Auth Context] Não é possível fazer refresh sem token');
@@ -183,7 +245,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     return await performTokenRefresh(token);
   };
-  // NOVO: Garantir que o token é válido
+
   const ensureValidToken = async (): Promise<boolean> => {
     if (!token) {
       console.warn('[Auth Context] Nenhum token disponível');
@@ -191,7 +253,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
 
     try {
-      // Testar se token atual funciona
       const isValid = await authService.validateToken(token);
 
       if (isValid) {
@@ -199,9 +260,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
         return true;
       }
 
-      // Token inválido, tentar refresh
       console.log('[Auth Context] Token inválido, tentando refresh...');
-      return await refreshAuthToken();
+      const refreshSuccess = await refreshAuthToken();
+
+      if (!refreshSuccess) {
+        console.warn('[Auth Context] Refresh falhou, mas não fazendo logout automático');
+      }
+
+      return refreshSuccess;
 
     } catch (error) {
       console.error('[Auth Context] Erro ao validar token:', error);
@@ -214,13 +280,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
       console.log('[Auth Context] Iniciando logout...');
       setIsLoading(true);
 
-      // REMOVIDO: tentativa de logout no backend (endpoint não existe)
-      // Apenas limpar dados locais
       await clearAuthData();
       console.log('[Auth Context] Logout realizado');
     } catch (error) {
       console.error('[Auth Context] Erro no logout:', error);
-      // Mesmo com erro, limpar dados locais
       await clearAuthData();
     } finally {
       setIsLoading(false);
@@ -245,7 +308,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
     } catch (error: any) {
       console.error('[Auth Context] Erro ao atualizar dados do usuário:', error);
 
-      // Se falhar ao buscar dados, pode ser que o token expirou
       if (error.statusCode === 401) {
         console.log('[Auth Context] Token expirado, fazendo logout');
         await logout();
@@ -263,14 +325,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     try {
       console.log('[Auth Context] Atualizando dados das lojas...');
-      await loadStoresData(token); // SEM retry automático
+      await loadStoresData(token);
     } catch (error) {
       console.error('[Auth Context] Erro ao atualizar dados das lojas:', error);
-      throw error; // Lança erro para quem chamou decidir o que fazer
+      throw error;
     }
   };
 
-  // NOVO: Método para trocar de loja
   const switchStore = async (storeId: string) => {
     try {
       console.log('[Auth Context] Trocando para loja:', storeId);
@@ -314,6 +375,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
     switchStore,
     refreshAuthToken,
     ensureValidToken,
+    canAccessStore,  // ✅ EXPORTADO
+    canManageStore,  // ✅ EXPORTADO
   };
 
   return (

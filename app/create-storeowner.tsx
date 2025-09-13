@@ -1,9 +1,9 @@
-// ========================================
-// CreateStoreWithOwnerScreen.tsx
-// ========================================
+// src/app/create-storeowner.tsx - ATUALIZADO COM SELEÇÃO DE COLEÇÕES
 
 import { useAuth } from '@/contexts/AuthContext';
 import { authService } from '@/services/authService';
+import { storeService } from '@/services/storeService';
+import { CollectionKey } from '@/types';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
@@ -23,14 +23,11 @@ import {
     View
 } from 'react-native';
 
-
-import { storeService } from '@/services/storeService';
-
 interface CreateStoreForm {
     name: string;
     clientEmail: string;
     ownerId: string;
-    ownerName: string; // Para display
+    ownerName: string;
     collections: Record<string, boolean>;
     theme: string;
     paymentMethods: string[];
@@ -43,8 +40,16 @@ interface UserOption {
     role: string;
 }
 
+interface CollectionOption {
+    key: string;
+    name: string;
+    displayName: string;
+    icon: string;
+    category: string;
+    description: string;
+}
+
 export default function CreateStoreWithOwnerScreen() {
-    console.log("tela crate store")
     const { user, token, refreshAuthToken } = useAuth();
     const router = useRouter();
 
@@ -65,6 +70,178 @@ export default function CreateStoreWithOwnerScreen() {
     const [showUserPicker, setShowUserPicker] = useState(false);
 
     const fadeAnim = React.useRef(new Animated.Value(0)).current;
+
+    // Lista completa de coleções disponíveis
+    const availableCollections: CollectionOption[] = [
+        {
+            key: CollectionKey.ITEM_COLLECTION_BIQUINIS,
+            name: 'biquinis',
+            displayName: 'Biquínis',
+            icon: 'woman',
+            category: 'Moda Praia',
+            description: 'Biquínis e peças de banho femininas'
+        },
+        {
+            key: CollectionKey.ITEM_COLLECTION_MONTESEUBIQUINI,
+            name: 'monte-seu-biquini',
+            displayName: 'Monte seu Biquíni',
+            icon: 'construct',
+            category: 'Personalizado',
+            description: 'Peças avulsas para montar biquínis'
+        },
+        {
+            key: CollectionKey.ITEM_COLLECTION_ACESSORIOS,
+            name: 'acessorios',
+            displayName: 'Acessórios',
+            icon: 'watch',
+            category: 'Acessórios',
+            description: 'Acessórios em geral'
+        },
+        {
+            key: CollectionKey.ITEM_COLLECTION_VESTUARIO,
+            name: 'vestuario',
+            displayName: 'Vestuário',
+            icon: 'shirt',
+            category: 'Roupas',
+            description: 'Roupas em geral'
+        },
+        {
+            key: CollectionKey.ITEM_COLLECTION_FITNESS,
+            name: 'fitness',
+            displayName: 'Fitness',
+            icon: 'fitness',
+            category: 'Esporte',
+            description: 'Roupas e acessórios para exercícios'
+        },
+        {
+            key: CollectionKey.ITEM_COLLECTION_MAIOS,
+            name: 'maios',
+            displayName: 'Maiôs',
+            icon: 'body',
+            category: 'Moda Praia',
+            description: 'Maiôs e peças únicas'
+        },
+        {
+            key: CollectionKey.ITEM_COLLECTION_SAIDAS,
+            name: 'saidas',
+            displayName: 'Saídas de Praia',
+            icon: 'sunny',
+            category: 'Moda Praia',
+            description: 'Saídas de praia e beach wear'
+        },
+        {
+            key: CollectionKey.ITEM_COLLECTION_CALCADOS,
+            name: 'calcados',
+            displayName: 'Calçados',
+            icon: 'footsteps',
+            category: 'Calçados',
+            description: 'Calçados em geral'
+        },
+        {
+            key: CollectionKey.ITEM_COLLECTION_BOLSAS,
+            name: 'bolsas',
+            displayName: 'Bolsas',
+            icon: 'bag',
+            category: 'Acessórios',
+            description: 'Bolsas e mochilas'
+        },
+        {
+            key: CollectionKey.ITEM_COLLECTION_CAMISETAS,
+            name: 'camisetas',
+            displayName: 'Camisetas',
+            icon: 'shirt',
+            category: 'Roupas',
+            description: 'Camisetas e t-shirts'
+        },
+        {
+            key: CollectionKey.ITEM_COLLECTION_SHORTS,
+            name: 'shorts',
+            displayName: 'Shorts',
+            icon: 'pants',
+            category: 'Roupas',
+            description: 'Shorts e bermudas'
+        },
+        {
+            key: CollectionKey.ITEM_COLLECTION_SAPATOS,
+            name: 'sapatos',
+            displayName: 'Sapatos',
+            icon: 'footsteps',
+            category: 'Calçados',
+            description: 'Sapatos sociais e casuais'
+        },
+        {
+            key: CollectionKey.ITEM_COLLECTION_TENIS,
+            name: 'tenis',
+            displayName: 'Tênis',
+            icon: 'fitness',
+            category: 'Calçados',
+            description: 'Tênis esportivos e casuais'
+        },
+        {
+            key: CollectionKey.ITEM_COLLECTION_CAMISAS,
+            name: 'camisas',
+            displayName: 'Camisas',
+            icon: 'business',
+            category: 'Roupas',
+            description: 'Camisas sociais e casuais'
+        },
+        {
+            key: CollectionKey.ITEM_COLLECTION_BLUSAS,
+            name: 'blusas',
+            displayName: 'Blusas',
+            icon: 'woman',
+            category: 'Roupas',
+            description: 'Blusas femininas'
+        },
+        {
+            key: CollectionKey.ITEM_COLLECTION_CALCAS,
+            name: 'calcas',
+            displayName: 'Calças',
+            icon: 'pants',
+            category: 'Roupas',
+            description: 'Calças em geral'
+        },
+        {
+            key: CollectionKey.ITEM_COLLECTION_JEANS,
+            name: 'jeans',
+            displayName: 'Jeans',
+            icon: 'pants',
+            category: 'Roupas',
+            description: 'Calças jeans e peças jeans'
+        },
+        {
+            key: CollectionKey.ITEM_COLLECTION_UNDERWEAR,
+            name: 'underwear',
+            displayName: 'Underwear',
+            icon: 'heart',
+            category: 'Íntimo',
+            description: 'Roupas íntimas básicas'
+        },
+        {
+            key: CollectionKey.ITEM_COLLECTION_LINGERIE,
+            name: 'lingerie',
+            displayName: 'Lingerie',
+            icon: 'heart',
+            category: 'Íntimo',
+            description: 'Lingerie e roupas íntimas'
+        },
+        {
+            key: CollectionKey.ITEM_COLLECTION_INFANTIL,
+            name: 'infantil',
+            displayName: 'Infantil',
+            icon: 'happy',
+            category: 'Infantil',
+            description: 'Roupas e acessórios infantis'
+        },
+        {
+            key: CollectionKey.ITEM_COLLECTION_MASCULINO,
+            name: 'masculino',
+            displayName: 'Masculino',
+            icon: 'man',
+            category: 'Masculino',
+            description: 'Roupas e acessórios masculinos'
+        }
+    ];
 
     React.useEffect(() => {
         if (!user || !token) {
@@ -118,6 +295,16 @@ export default function CreateStoreWithOwnerScreen() {
             newErrors.ownerId = 'Selecione o proprietário';
         }
 
+        // Verificar se pelo menos uma coleção foi selecionada
+        const selectedCollections = Object.values(form.collections).filter(Boolean);
+        if (selectedCollections.length === 0) {
+            Alert.alert(
+                'Coleções necessárias',
+                'Selecione pelo menos uma coleção para a loja.'
+            );
+            return false;
+        }
+
         setErrors(newErrors);
         return Object.keys(newErrors).length === 0;
     };
@@ -141,13 +328,14 @@ export default function CreateStoreWithOwnerScreen() {
             const response = await storeService.createStoreWithOwner(storeData, token!);
 
             if (response.data.newToken) {
-                // Atualizar token se necessário
                 await refreshAuthToken();
             }
 
+            const selectedCount = Object.values(form.collections).filter(Boolean).length;
+
             Alert.alert(
                 'Sucesso',
-                'Loja criada com sucesso!',
+                `Loja "${form.name}" criada com sucesso!\n\n${selectedCount} coleções foram ativadas.`,
                 [
                     {
                         text: 'OK',
@@ -174,6 +362,32 @@ export default function CreateStoreWithOwnerScreen() {
         setShowUserPicker(false);
     };
 
+    const toggleCollection = (collectionKey: string) => {
+        setForm(prev => ({
+            ...prev,
+            collections: {
+                ...prev.collections,
+                [collectionKey]: !prev.collections[collectionKey]
+            }
+        }));
+    };
+
+    const toggleAllCollections = (enable: boolean) => {
+        const newCollections: Record<string, boolean> = {};
+        availableCollections.forEach(collection => {
+            newCollections[collection.key] = enable;
+        });
+
+        setForm(prev => ({
+            ...prev,
+            collections: newCollections
+        }));
+    };
+
+    const getSelectedCollectionsCount = () => {
+        return Object.values(form.collections).filter(Boolean).length;
+    };
+
     const paymentOptions = [
         { value: 'credit_card', label: 'Cartão de Crédito' },
         { value: 'debit_card', label: 'Cartão de Débito' },
@@ -188,6 +402,72 @@ export default function CreateStoreWithOwnerScreen() {
                 ? prev.paymentMethods.filter(m => m !== method)
                 : [...prev.paymentMethods, method]
         }));
+    };
+
+    const getCollectionIcon = (icon: string): any => {
+        const iconMap: { [key: string]: any } = {
+            'woman': 'woman-outline',
+            'construct': 'construct-outline',
+            'watch': 'watch-outline',
+            'shirt': 'shirt-outline',
+            'fitness': 'fitness-outline',
+            'body': 'body-outline',
+            'sunny': 'sunny-outline',
+            'footsteps': 'footsteps-outline',
+            'bag': 'bag-outline',
+            'pants': 'pants-outline',
+            'business': 'business-outline',
+            'heart': 'heart-outline',
+            'happy': 'happy-outline',
+            'man': 'man-outline',
+            'default': 'cube-outline'
+        };
+        return iconMap[icon] || iconMap['default'];
+    };
+
+    const renderCollectionItem = ({ item }: { item: CollectionOption }) => {
+        const isSelected = form.collections[item.key] || false;
+
+        return (
+            <TouchableOpacity
+                style={[
+                    styles.collectionItem,
+                    isSelected && styles.collectionItemSelected
+                ]}
+                onPress={() => toggleCollection(item.key)}
+            >
+                <View style={styles.collectionItemContent}>
+                    <View style={[
+                        styles.collectionIcon,
+                        { backgroundColor: isSelected ? 'rgba(102, 126, 234, 0.3)' : 'rgba(255,255,255,0.1)' }
+                    ]}>
+                        <Ionicons
+                            name={getCollectionIcon(item.icon)}
+                            size={20}
+                            color={isSelected ? '#667eea' : 'rgba(255,255,255,0.6)'}
+                        />
+                    </View>
+                    <View style={styles.collectionInfo}>
+                        <Text style={[
+                            styles.collectionName,
+                            { color: isSelected ? '#667eea' : 'white' }
+                        ]}>
+                            {item.displayName}
+                        </Text>
+                        <Text style={styles.collectionCategory}>{item.category}</Text>
+                        <Text style={styles.collectionDescription}>{item.description}</Text>
+                    </View>
+                    <View style={[
+                        styles.collectionCheckbox,
+                        isSelected && styles.collectionCheckboxSelected
+                    ]}>
+                        {isSelected && (
+                            <Ionicons name="checkmark" size={16} color="white" />
+                        )}
+                    </View>
+                </View>
+            </TouchableOpacity>
+        );
     };
 
     return (
@@ -304,6 +584,51 @@ export default function CreateStoreWithOwnerScreen() {
                             </View>
                         </LinearGradient>
                     </View>
+
+                    {/* Collections Selection */}
+                    <ScrollView style={styles.formCard}>
+                        <LinearGradient
+                            colors={['rgba(255,255,255,0.15)', 'rgba(255,255,255,0.05)']}
+                            style={styles.formGradient}
+                        >
+                            <View style={styles.formHeader}>
+                                <Ionicons name="apps" size={24} color="#667eea" />
+                                <View style={styles.collectionsHeaderContent}>
+                                    <Text style={styles.formTitle}>Coleções da Loja</Text>
+                                    <Text style={styles.collectionsSubtitle}>
+                                        {getSelectedCollectionsCount()} de {availableCollections.length} selecionadas
+                                    </Text>
+                                </View>
+                            </View>
+
+                            {/* Bulk Actions */}
+                            <View style={styles.bulkActions}>
+                                <TouchableOpacity
+                                    style={styles.bulkActionButton}
+                                    onPress={() => toggleAllCollections(true)}
+                                >
+                                    <Text style={styles.bulkActionText}>Selecionar Todas</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                    style={styles.bulkActionButton}
+                                    onPress={() => toggleAllCollections(false)}
+                                >
+                                    <Text style={styles.bulkActionText}>Desmarcar Todas</Text>
+                                </TouchableOpacity>
+                            </View>
+
+                            {/* Collections List */}
+                            <View style={styles.collectionsContainer}>
+                                <FlatList
+                                    data={availableCollections}
+                                    renderItem={renderCollectionItem}
+                                    keyExtractor={(item) => item.key}
+                                    scrollEnabled={false}
+                                    ItemSeparatorComponent={() => <View style={styles.collectionSeparator} />}
+                                />
+                            </View>
+                        </LinearGradient>
+                    </ScrollView>
 
                     {/* Submit Button */}
                     <TouchableOpacity
@@ -445,6 +770,100 @@ const styles = StyleSheet.create({
         marginLeft: 12,
     },
 
+    // Collections Header
+    collectionsHeaderContent: {
+        marginLeft: 12,
+        flex: 1,
+    },
+    collectionsSubtitle: {
+        fontSize: 12,
+        color: 'rgba(102, 126, 234, 0.8)',
+        marginTop: 2,
+    },
+
+    // Bulk Actions
+    bulkActions: {
+        flexDirection: 'row',
+        gap: 12,
+        marginBottom: 16,
+    },
+    bulkActionButton: {
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        backgroundColor: 'rgba(102, 126, 234, 0.2)',
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: 'rgba(102, 126, 234, 0.3)',
+    },
+    bulkActionText: {
+        fontSize: 12,
+        color: '#667eea',
+        fontWeight: '600',
+    },
+
+    // Collections Container
+    collectionsContainer: {
+        maxHeight: 400,
+    },
+    collectionItem: {
+        borderRadius: 12,
+        backgroundColor: 'rgba(255,255,255,0.05)',
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.1)',
+    },
+    collectionItemSelected: {
+        backgroundColor: 'rgba(102, 126, 234, 0.1)',
+        borderColor: 'rgba(102, 126, 234, 0.3)',
+    },
+    collectionItemContent: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: 12,
+    },
+    collectionIcon: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: 12,
+    },
+    collectionInfo: {
+        flex: 1,
+    },
+    collectionName: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: 'white',
+        marginBottom: 2,
+    },
+    collectionCategory: {
+        fontSize: 11,
+        color: 'rgba(255,255,255,0.6)',
+        marginBottom: 2,
+    },
+    collectionDescription: {
+        fontSize: 10,
+        color: 'rgba(255,255,255,0.5)',
+        lineHeight: 14,
+    },
+    collectionCheckbox: {
+        width: 24,
+        height: 24,
+        borderRadius: 12,
+        borderWidth: 2,
+        borderColor: 'rgba(255,255,255,0.3)',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    collectionCheckboxSelected: {
+        backgroundColor: '#667eea',
+        borderColor: '#667eea',
+    },
+    collectionSeparator: {
+        height: 8,
+    },
+
     // Input Groups
     inputGroup: {
         marginBottom: 20,
@@ -476,60 +895,6 @@ const styles = StyleSheet.create({
         fontSize: 12,
         marginTop: 4,
         marginLeft: 4,
-    },
-
-    // Role Selection
-    roleOption: {
-        backgroundColor: 'rgba(255,255,255,0.05)',
-        borderRadius: 12,
-        padding: 16,
-        marginBottom: 12,
-        borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.1)',
-    },
-    roleOptionSelected: {
-        borderColor: '#667eea',
-        backgroundColor: 'rgba(102, 126, 234, 0.1)',
-    },
-    roleOptionContent: {
-        flex: 1,
-    },
-    roleOptionHeader: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        marginBottom: 4,
-    },
-    roleOptionLabel: {
-        fontSize: 16,
-        color: 'white',
-        fontWeight: '600',
-    },
-    roleOptionLabelSelected: {
-        color: '#667eea',
-    },
-    roleOptionDescription: {
-        fontSize: 13,
-        color: 'rgba(255,255,255,0.6)',
-        lineHeight: 18,
-    },
-    radioButton: {
-        width: 20,
-        height: 20,
-        borderRadius: 10,
-        borderWidth: 2,
-        borderColor: 'rgba(255,255,255,0.4)',
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    radioButtonSelected: {
-        borderColor: '#667eea',
-    },
-    radioButtonInner: {
-        width: 8,
-        height: 8,
-        borderRadius: 4,
-        backgroundColor: '#667eea',
     },
 
     // User Picker

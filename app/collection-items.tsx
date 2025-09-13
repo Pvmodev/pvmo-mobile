@@ -1,6 +1,7 @@
 import { useAuth } from '@/contexts/AuthContext';
-import { Product, productService } from '@/services/productService';
+import { productService } from '@/services/productService';
 import { storeService } from '@/services/storeService';
+import { CollectionKey, Product } from '@/types';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -68,11 +69,11 @@ const ProductItem = React.memo(({ item, onPress, index }: ProductItemProps) => {
             (item.storageEXG || 0);
     };
 
-    const formatPrice = (price: number) => {
+    const formatPrice = (priceInCents: number) => {
         return new Intl.NumberFormat('pt-BR', {
             style: 'currency',
             currency: 'BRL'
-        }).format(price);
+        }).format(priceInCents / 100);
     };
 
     const getDiscountedPrice = () => {
@@ -301,7 +302,7 @@ export default function CollectionItemsScreen() {
                 {
                     page,
                     limit: itemsPerPage,
-                    collectionKey: params.collectionKey,
+                    collectionKey: params.collectionKey as CollectionKey,
                     search: searchTerm,
                     isActive: currentFilters.isActive,
                     featured: currentFilters.featured,

@@ -1,148 +1,185 @@
+// src/components/collections/CollectionItem.tsx
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import React, { useEffect, useRef } from 'react';
+import React from 'react';
 import {
-    Animated,
     StyleSheet,
     Text,
     TouchableOpacity,
     View,
 } from 'react-native';
 
-interface Collection {
+interface CollectionInfo {
     key: string;
-    isActive: boolean;
+    name: string;
     displayName: string;
-    description: string;
     icon: string;
+    category: string;
+    description?: string;
+    isActive: boolean;
+    productCount?: number;
 }
 
 interface CollectionItemProps {
-    item: Collection;
-    onToggle: (key: string, status: boolean) => void;
-    onAddProduct: (key: string) => void;
+    item: CollectionInfo;
+    onToggle: (collectionKey: string, currentStatus: boolean) => void;
+    onAddProduct: (collectionKey: string) => void;
 }
 
 export default function CollectionItem({ item, onToggle, onAddProduct }: CollectionItemProps) {
-    const animatedValue = useRef(new Animated.Value(0)).current;
     const router = useRouter();
 
-    useEffect(() => {
-        Animated.timing(animatedValue, {
-            toValue: 1,
-            duration: 400,
-            delay: Math.random() * 200,
-            useNativeDriver: true,
-        }).start();
-    }, []);
-
-    const handleCardPress = () => {
+    const handleViewProducts = () => {
         router.push(`/collection-items?collectionKey=${item.key}`);
     };
 
-    const handleTogglePress = (event: any) => {
-        event.stopPropagation(); // Prevent card press
-        onToggle(item.key, item.isActive);
+    const getCollectionIcon = (icon: string): any => {
+        // Map dos ícones baseado no tipo de coleção
+        const iconMap: { [key: string]: any } = {
+            'bikini': 'woman-outline',
+            'swimwear': 'water-outline',
+            'accessories': 'watch-outline',
+            'clothing': 'shirt-outline',
+            'fitness': 'fitness-outline',
+            'swimsuit': 'body-outline',
+            'beachwear': 'sunny-outline',
+            'shoes': 'footsteps-outline',
+            'bags': 'bag-outline',
+            'tshirts': 'shirt-outline',
+            'shorts': 'pants-outline',
+            'sneakers': 'footsteps-outline',
+            'shirts': 'business-outline',
+            'blouses': 'woman-outline',
+            'pants': 'pants-outline',
+            'jeans': 'pants-outline',
+            'underwear': 'heart-outline',
+            'lingerie': 'heart-outline',
+            'kids': 'happy-outline',
+            'men': 'man-outline',
+            'default': 'cube-outline'
+        };
+
+        return iconMap[icon] || iconMap['default'];
     };
 
-    const handleAddProductPress = (event: any) => {
-        event.stopPropagation(); // Prevent card press
-        onAddProduct(item.key);
+    const getStatusColor = (isActive: boolean) => {
+        return isActive ? '#4CAF50' : '#FF3B30';
+    };
+
+    const getStatusBgColor = (isActive: boolean) => {
+        return isActive ? 'rgba(76, 175, 80, 0.2)' : 'rgba(255, 59, 48, 0.2)';
     };
 
     return (
-        <Animated.View
-            style={{
-                opacity: animatedValue,
-                transform: [
-                    {
-                        translateY: animatedValue.interpolate({
-                            inputRange: [0, 1],
-                            outputRange: [20, 0],
-                        }),
-                    },
-                ],
-            }}
-        >
-            <TouchableOpacity
-                style={styles.collectionCard}
-                onPress={handleCardPress}
-                activeOpacity={0.8}
+        <View style={styles.collectionCard}>
+            <LinearGradient
+                colors={[
+                    item.isActive
+                        ? 'rgba(102, 126, 234, 0.1)'
+                        : 'rgba(255, 255, 255, 0.05)',
+                    'rgba(255,255,255,0.02)'
+                ]}
+                style={styles.collectionGradient}
             >
-                <LinearGradient
-                    colors={['rgba(255,255,255,0.15)', 'rgba(255,255,255,0.05)']}
-                    style={styles.collectionGradient}
-                >
-                    <View style={styles.collectionHeader}>
-                        <View style={styles.collectionIconContainer}>
-                            <Ionicons
-                                name={item.icon as any}
-                                size={24}
-                                color={item.isActive ? '#667eea' : '#999'}
-                            />
-                        </View>
-                        <View style={styles.collectionInfo}>
-                            <Text style={styles.collectionName}>{item.displayName}</Text>
-                            <Text style={styles.collectionDescription}>{item.description}</Text>
-                        </View>
-                        <View style={styles.collectionActions}>
-                            <View style={[
-                                styles.statusBadge,
-                                { backgroundColor: item.isActive ? '#4CAF50' : '#FF9800' }
+                <View style={styles.collectionHeader}>
+                    <View style={styles.collectionIconContainer}>
+                        <Ionicons
+                            name={getCollectionIcon(item.icon)}
+                            size={24}
+                            color={item.isActive ? '#667eea' : 'rgba(255,255,255,0.5)'}
+                        />
+                    </View>
+                    <View style={styles.collectionInfo}>
+                        <Text style={styles.collectionName}>{item.displayName}</Text>
+                        <Text style={styles.collectionDescription}>
+                            {item.description || `Produtos de ${item.category}`}
+                        </Text>
+                        {item.productCount !== undefined && (
+                            <Text style={styles.productCount}>
+                                {item.productCount} produto{item.productCount !== 1 ? 's' : ''}
+                            </Text>
+                        )}
+                    </View>
+                    <View style={styles.collectionActions}>
+                        <View style={[
+                            styles.statusBadge,
+                            { backgroundColor: getStatusBgColor(item.isActive) }
+                        ]}>
+                            <Text style={[
+                                styles.statusText,
+                                { color: getStatusColor(item.isActive) }
                             ]}>
-                                <Text style={styles.statusText}>
-                                    {item.isActive ? 'Ativa' : 'Inativa'}
-                                </Text>
-                            </View>
-                            <Ionicons
-                                name="chevron-forward"
-                                size={20}
-                                color="rgba(255,255,255,0.6)"
-                                style={styles.chevronIcon}
-                            />
+                                {item.isActive ? 'Ativa' : 'Inativa'}
+                            </Text>
                         </View>
                     </View>
+                </View>
 
-                    <View style={styles.collectionFooter}>
+                <View style={styles.collectionFooter}>
+                    {/* Toggle Status Button */}
+                    <TouchableOpacity
+                        style={[
+                            styles.actionButton,
+                            {
+                                backgroundColor: item.isActive
+                                    ? 'rgba(255, 59, 48, 0.2)'
+                                    : 'rgba(76, 175, 80, 0.2)'
+                            }
+                        ]}
+                        onPress={() => onToggle(item.key, item.isActive)}
+                    >
+                        <Ionicons
+                            name={item.isActive ? "pause" : "play"}
+                            size={14}
+                            color={item.isActive ? '#FF3B30' : '#4CAF50'}
+                        />
+                        <Text style={[
+                            styles.actionButtonText,
+                            { color: item.isActive ? '#FF3B30' : '#4CAF50' }
+                        ]}>
+                            {item.isActive ? 'Desativar' : 'Ativar'}
+                        </Text>
+                    </TouchableOpacity>
+
+                    {/* View Products Button */}
+                    <TouchableOpacity
+                        style={[
+                            styles.actionButton,
+                            { backgroundColor: 'rgba(102, 126, 234, 0.2)' }
+                        ]}
+                        onPress={handleViewProducts}
+                    >
+                        <Ionicons name="eye" size={14} color="#667eea" />
+                        <Text style={[styles.actionButtonText, { color: '#667eea' }]}>
+                            Ver Itens
+                        </Text>
+                    </TouchableOpacity>
+
+                    {/* Add Product Button */}
+                    {item.isActive && (
                         <TouchableOpacity
                             style={[
                                 styles.actionButton,
-                                { backgroundColor: item.isActive ? '#FF6B6B' : '#4CAF50' }
+                                styles.addProductButton,
+                                { backgroundColor: 'rgba(102, 126, 234, 0.3)' }
                             ]}
-                            onPress={handleTogglePress}
+                            onPress={() => onAddProduct(item.key)}
                         >
-                            <Ionicons
-                                name={item.isActive ? 'pause' : 'play'}
-                                size={16}
-                                color="white"
-                            />
-                            <Text style={styles.actionButtonText}>
-                                {item.isActive ? 'Desativar' : 'Ativar'}
+                            <Ionicons name="add" size={14} color="#667eea" />
+                            <Text style={[styles.actionButtonText, { color: '#667eea' }]}>
+                                Adicionar
                             </Text>
                         </TouchableOpacity>
+                    )}
+                </View>
 
-                        {item.isActive && (
-                            <TouchableOpacity
-                                style={[styles.actionButton, { backgroundColor: '#667eea' }]}
-                                onPress={handleAddProductPress}
-                            >
-                                <Ionicons name="add" size={16} color="white" />
-                                <Text style={styles.actionButtonText}>Produto</Text>
-                            </TouchableOpacity>
-                        )}
-
-                        <TouchableOpacity
-                            style={[styles.actionButton, { backgroundColor: '#9C27B0' }]}
-                            onPress={handleCardPress}
-                        >
-                            <Ionicons name="list" size={16} color="white" />
-                            <Text style={styles.actionButtonText}>Ver Itens</Text>
-                        </TouchableOpacity>
-                    </View>
-                </LinearGradient>
-            </TouchableOpacity>
-        </Animated.View>
+                {/* Category Tag */}
+                <View style={styles.categoryTag}>
+                    <Text style={styles.categoryText}>{item.category}</Text>
+                </View>
+            </LinearGradient>
+        </View>
     );
 }
 
@@ -150,11 +187,13 @@ const styles = StyleSheet.create({
     collectionCard: {
         borderRadius: 12,
         overflow: 'hidden',
+        marginBottom: 8,
     },
     collectionGradient: {
         borderWidth: 1,
         borderColor: 'rgba(255,255,255,0.2)',
         padding: 16,
+        position: 'relative',
     },
     collectionHeader: {
         flexDirection: 'row',
@@ -182,11 +221,15 @@ const styles = StyleSheet.create({
     collectionDescription: {
         fontSize: 13,
         color: 'rgba(255,255,255,0.6)',
+        marginBottom: 4,
+    },
+    productCount: {
+        fontSize: 11,
+        color: 'rgba(255,255,255,0.5)',
+        fontWeight: '500',
     },
     collectionActions: {
         alignItems: 'flex-end',
-        flexDirection: 'row',
-        gap: 8,
     },
     statusBadge: {
         paddingHorizontal: 8,
@@ -197,12 +240,8 @@ const styles = StyleSheet.create({
     },
     statusText: {
         fontSize: 11,
-        color: 'white',
         fontWeight: '600',
         textTransform: 'uppercase',
-    },
-    chevronIcon: {
-        marginLeft: 4,
     },
     collectionFooter: {
         flexDirection: 'row',
@@ -215,10 +254,31 @@ const styles = StyleSheet.create({
         paddingVertical: 8,
         borderRadius: 8,
         gap: 4,
+        minWidth: 80,
+        justifyContent: 'center',
+    },
+    addProductButton: {
+        borderWidth: 1,
+        borderColor: 'rgba(102, 126, 234, 0.4)',
     },
     actionButtonText: {
         fontSize: 12,
-        color: 'white',
         fontWeight: '600',
+    },
+    categoryTag: {
+        position: 'absolute',
+        top: 8,
+        right: 8,
+        backgroundColor: 'rgba(0,0,0,0.3)',
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+        borderRadius: 6,
+    },
+    categoryText: {
+        fontSize: 9,
+        color: 'rgba(255,255,255,0.7)',
+        fontWeight: '600',
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
     },
 });

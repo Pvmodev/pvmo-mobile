@@ -284,8 +284,7 @@ export default function StoresManagementScreen() {
         if (user?.role === 'PVMO_ADMIN') return true;
         // Verificar se é proprietário baseado nas permissões
         return user?.stores?.some(userStore =>
-            userStore.storeId === store.id &&
-            userStore.permissions?.canManage === true
+            userStore.storeId === store.id
         ) || false;
     };
 

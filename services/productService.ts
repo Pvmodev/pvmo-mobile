@@ -1,350 +1,601 @@
-import { API_CONFIG } from '@/config/api';
-import { apiService } from './api';
-
-export interface ProductData {
-    collectionKey: string;
-    name: string;
-    type: string;
-    description: string;
-    imageList: string[];
-    videoUrl: string[];
-    tag: string[];
-    storageP: number;
-    storageM: number;
-    storageG: number;
-    storageU: number;
-    storageChild?: number;
-    storagePP?: number;
-    storageGG?: number;
-    storageEXG?: number;
-    storageLocation: string;
-    price: number;
-    discount: number;
-    featured: boolean;
-    isActive: boolean;
-    sponsor: string;
-    weight: number;
-    dimensions: {
-        length: number;
-        width: number;
-        height: number;
-        unit: string;
-    };
-    correlated: string[];
-    marketAffiliateIds: string[];
-    analytics: {
-        views: number;
-        sales: number;
-        addCart: number;
-        review: number;
-    };
+// src/services/productService.ts
+import { API_CONFIG, getApiUrl, getAuthHeaders } from '@/config/api';
+import {
+    ApiResponse,
+    CollectionKey,
+    Product,
+    ProductData,
+    ProductListResponse
+} from '@/types';
+import { fetchWithTimeout } from '@/utils/fetchWithTimeout';
+interface GetProductsParams {
+    page?: number;
+    limit?: number;
+    collectionKey?: CollectionKey;
+    search?: string;
+    isActive?: boolean;
+    featured?: boolean;
+    minPrice?: number;
+    maxPrice?: number;
+    tags?: string[];
 }
 
-export interface Product extends ProductData {
-    id: string;
-    createdAt: Date;
-    updatedAt: Date;
-}
-
-// Interface para resposta da API
-interface ProductListResponse {
-    items: Product[];
-    total: number;
-    page: number;
-    totalPages: number;
-    collectionKey?: string;
+interface ProductUpdateData extends Partial<ProductData> {
+    id?: string;
 }
 
 class ProductService {
-    // CORRIGIDO: Usar storeSlug em vez de storeId
-    async createProduct(storeSlug: string, productData: ProductData, token: string): Promise<Product> {
-        console.log('Criando produto para loja:', storeSlug);
-
-        try {
-            const endpoint = API_CONFIG.ENDPOINTS.COLLECTIONS.CREATE_PLATFORM(storeSlug);
-            const response = await apiService.post<Product>(endpoint, productData, token);
-
-            if (!response.success || !response.data) {
-                throw new Error(response.message || 'Erro ao criar produto');
-            }
-
-            console.log('Produto criado com sucesso:', response.data.id);
-            return response.data;
-        } catch (error) {
-            console.error('Erro ao criar produto:', error);
-            throw error;
-        }
-    }
-
-    // CORRIGIDO: Usar nova estrutura de resposta da API
+    /**
+     * Buscar produtos de uma loja (rota pública)
+     */
     async getProducts(
         storeSlug: string,
-        options: {
-            collectionKey?: string;
-            page?: number;
-            limit?: number;
-            isActive?: boolean;
-            featured?: boolean;
-            search?: string;
-        } = {},
+        params: GetProductsParams = {},
         token?: string
     ): Promise<ProductListResponse> {
-        console.log('Buscando produtos para loja:', storeSlug);
-
         try {
-            const { page = 1, limit = 20, collectionKey, isActive, featured, search } = options;
-
-            // Construir query parameters
             const queryParams = new URLSearchParams();
-            queryParams.append('page', page.toString());
-            queryParams.append('limit', limit.toString());
 
-            if (collectionKey) queryParams.append('collectionKey', collectionKey);
-            if (isActive !== undefined) queryParams.append('isActive', isActive.toString());
-            if (featured !== undefined) queryParams.append('featured', featured.toString());
-            if (search) queryParams.append('search', search);
+            if (params.page) queryParams.append('page', params.page.toString());
+            if (params.limit) queryParams.append('limit', params.limit.toString());
+            if (params.collectionKey) queryParams.append('collectionKey', params.collectionKey);
+            if (params.search) queryParams.append('search', params.search);
+            if (params.isActive !== undefined) queryParams.append('isActive', params.isActive.toString());
+            if (params.featured !== undefined) queryParams.append('featured', params.featured.toString());
+            if (params.minPrice) queryParams.append('minPrice', params.minPrice.toString());
+            if (params.maxPrice) queryParams.append('maxPrice', params.maxPrice.toString());
+            if (params.tags?.length) queryParams.append('tags', params.tags.join(','));
 
-            let endpoint = API_CONFIG.ENDPOINTS.COLLECTIONS.ITEMS(storeSlug);
-            if (token) {
-                // Se tem token, usar endpoint administrativo que mostra todos os produtos
-                endpoint = API_CONFIG.ENDPOINTS.COLLECTIONS.ADMIN_ALL(storeSlug);
+            const endpoint = API_CONFIG.ENDPOINTS.COLLECTIONS.ITEMS(storeSlug);
+            const url = `${getApiUrl(endpoint)}?${queryParams}`;
+
+            console.log('🔍 [ProductService] Buscando produtos:', url);
+
+            const response = await fetchWithTimeout(url, {
+                method: 'GET',
+                headers: getAuthHeaders(token),
+                timeout: API_CONFIG.TIMEOUT,
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw {
+                    statusCode: response.status,
+                    message: errorData.message || `Erro ${response.status}: ${response.statusText}`,
+                    error: errorData.error || 'API_ERROR'
+                };
             }
 
-            endpoint += `?${queryParams.toString()}`;
+            const data: ApiResponse<ProductListResponse> = await response.json();
 
-            const response = await apiService.get<ProductListResponse>(endpoint, token);
-
-            if (!response.success || !response.data) {
-                throw new Error(response.message || 'Erro ao buscar produtos');
+            if (!data.success || !data.data) {
+                throw {
+                    statusCode: 500,
+                    message: 'Resposta inválida da API',
+                    error: 'INVALID_RESPONSE'
+                };
             }
 
-            console.log('Produtos encontrados:', response.data.total);
-            return response.data;
-        } catch (error) {
-            console.error('Erro ao buscar produtos:', error);
-            throw error;
+            console.log('✅ [ProductService] Produtos carregados:', data.data.total);
+            return data.data;
+
+        } catch (error: any) {
+            console.error('❌ [ProductService] Erro ao buscar produtos:', error);
+            throw {
+                statusCode: error.statusCode || 0,
+                message: error.message || 'Erro de conexão',
+                error: error.error || 'NETWORK_ERROR'
+            };
         }
     }
 
-    async getProduct(storeSlug: string, productId: string, token?: string): Promise<Product> {
-        console.log('Buscando produto:', productId);
-
+    /**
+     * Buscar todos os produtos (admin da plataforma)
+     */
+    async getAllProducts(
+        storeSlug: string,
+        params: GetProductsParams = {},
+        token: string
+    ): Promise<ProductListResponse> {
         try {
-            const endpoint = `${API_CONFIG.ENDPOINTS.COLLECTIONS.ITEMS(storeSlug)}/${productId}`;
-            const response = await apiService.get<Product>(endpoint, token);
+            const queryParams = new URLSearchParams();
 
-            if (!response.success || !response.data) {
-                throw new Error(response.message || 'Produto não encontrado');
+            if (params.page) queryParams.append('page', params.page.toString());
+            if (params.limit) queryParams.append('limit', params.limit.toString());
+            if (params.collectionKey) queryParams.append('collectionKey', params.collectionKey);
+            if (params.search) queryParams.append('search', params.search);
+
+            const endpoint = API_CONFIG.ENDPOINTS.COLLECTIONS.ADMIN_ALL(storeSlug);
+            const url = `${getApiUrl(endpoint)}?${queryParams}`;
+
+            console.log('🔍 [ProductService] Buscando todos os produtos (admin):', url);
+
+            const response = await fetchWithTimeout(url, {
+                method: 'GET',
+                headers: getAuthHeaders(token),
+                timeout: API_CONFIG.TIMEOUT,
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw {
+                    statusCode: response.status,
+                    message: errorData.message || `Erro ${response.status}: ${response.statusText}`,
+                    error: errorData.error || 'API_ERROR'
+                };
             }
 
-            console.log('Produto encontrado:', response.data.name);
-            return response.data;
-        } catch (error) {
-            console.error('Erro ao buscar produto:', error);
-            throw error;
+            const data: ApiResponse<ProductListResponse> = await response.json();
+
+            if (!data.success || !data.data) {
+                throw {
+                    statusCode: 500,
+                    message: 'Resposta inválida da API',
+                    error: 'INVALID_RESPONSE'
+                };
+            }
+
+            console.log('✅ [ProductService] Todos os produtos carregados:', data.data.total);
+            return data.data;
+
+        } catch (error: any) {
+            console.error('❌ [ProductService] Erro ao buscar todos os produtos:', error);
+            throw {
+                statusCode: error.statusCode || 0,
+                message: error.message || 'Erro de conexão',
+                error: error.error || 'NETWORK_ERROR'
+            };
         }
     }
 
+    /**
+     * Buscar produto específico
+     */
+    async getProduct(storeSlug: string, productId: string, token?: string): Promise<Product> {
+        try {
+            const endpoint = API_CONFIG.ENDPOINTS.COLLECTIONS.ITEM_GET(storeSlug, productId);
+            const url = getApiUrl(endpoint);
+
+            console.log('🔍 [ProductService] Buscando produto:', productId);
+
+            const response = await fetchWithTimeout(url, {
+                method: 'GET',
+                headers: getAuthHeaders(token),
+                timeout: API_CONFIG.TIMEOUT,
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw {
+                    statusCode: response.status,
+                    message: errorData.message || `Erro ${response.status}: ${response.statusText}`,
+                    error: errorData.error || 'API_ERROR'
+                };
+            }
+
+            const data: ApiResponse<Product> = await response.json();
+
+            if (!data.success || !data.data) {
+                throw {
+                    statusCode: 500,
+                    message: 'Resposta inválida da API',
+                    error: 'INVALID_RESPONSE'
+                };
+            }
+
+            console.log('✅ [ProductService] Produto carregado:', data.data.name);
+            return data.data;
+
+        } catch (error: any) {
+            console.error('❌ [ProductService] Erro ao buscar produto:', error);
+            throw {
+                statusCode: error.statusCode || 0,
+                message: error.message || 'Erro de conexão',
+                error: error.error || 'NETWORK_ERROR'
+            };
+        }
+    }
+
+    /**
+     * Criar produto (admin da plataforma)
+     */
+    async createProduct(storeSlug: string, productData: ProductData, token: string): Promise<Product> {
+        try {
+            const endpoint = API_CONFIG.ENDPOINTS.COLLECTIONS.CREATE_PLATFORM(storeSlug);
+            const url = getApiUrl(endpoint);
+
+            console.log('📝 [ProductService] Criando produto:', productData.name);
+
+            const response = await fetchWithTimeout(url, {
+                method: 'POST',
+                headers: getAuthHeaders(token),
+                body: JSON.stringify(productData),
+                timeout: API_CONFIG.TIMEOUT,
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw {
+                    statusCode: response.status,
+                    message: errorData.message || `Erro ${response.status}: ${response.statusText}`,
+                    error: errorData.error || 'API_ERROR'
+                };
+            }
+
+            const data: ApiResponse<Product> = await response.json();
+
+            if (!data.success || !data.data) {
+                throw {
+                    statusCode: 500,
+                    message: 'Resposta inválida da API',
+                    error: 'INVALID_RESPONSE'
+                };
+            }
+
+            console.log('✅ [ProductService] Produto criado:', data.data.id);
+            return data.data;
+
+        } catch (error: any) {
+            console.error('❌ [ProductService] Erro ao criar produto:', error);
+            throw {
+                statusCode: error.statusCode || 0,
+                message: error.message || 'Erro de conexão',
+                error: error.error || 'NETWORK_ERROR'
+            };
+        }
+    }
+
+    /**
+     * Criar produto (dono da loja)
+     */
+    async createProductAsStoreAdmin(storeSlug: string, productData: ProductData, token: string): Promise<Product> {
+        try {
+            const endpoint = API_CONFIG.ENDPOINTS.COLLECTIONS.CREATE_STORE(storeSlug);
+            const url = getApiUrl(endpoint);
+
+            console.log('📝 [ProductService] Criando produto (store admin):', productData.name);
+
+            const response = await fetchWithTimeout(url, {
+                method: 'POST',
+                headers: getAuthHeaders(token),
+                body: JSON.stringify(productData),
+                timeout: API_CONFIG.TIMEOUT,
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw {
+                    statusCode: response.status,
+                    message: errorData.message || `Erro ${response.status}: ${response.statusText}`,
+                    error: errorData.error || 'API_ERROR'
+                };
+            }
+
+            const data: ApiResponse<Product> = await response.json();
+
+            if (!data.success || !data.data) {
+                throw {
+                    statusCode: 500,
+                    message: 'Resposta inválida da API',
+                    error: 'INVALID_RESPONSE'
+                };
+            }
+
+            console.log('✅ [ProductService] Produto criado (store admin):', data.data.id);
+            return data.data;
+
+        } catch (error: any) {
+            console.error('❌ [ProductService] Erro ao criar produto (store admin):', error);
+            throw {
+                statusCode: error.statusCode || 0,
+                message: error.message || 'Erro de conexão',
+                error: error.error || 'NETWORK_ERROR'
+            };
+        }
+    }
+
+    /**
+     * Atualizar produto (admin da plataforma)
+     */
     async updateProduct(
         storeSlug: string,
         productId: string,
-        productData: Partial<ProductData>,
+        productData: ProductUpdateData,
         token: string
     ): Promise<Product> {
-        console.log('Atualizando produto:', productId);
-
         try {
-            const endpoint = `${API_CONFIG.ENDPOINTS.COLLECTIONS.CREATE_PLATFORM(storeSlug)}/${productId}`;
-            const response = await apiService.patch<Product>(endpoint, productData, token);
+            const endpoint = API_CONFIG.ENDPOINTS.COLLECTIONS.UPDATE_PLATFORM(storeSlug, productId);
+            const url = getApiUrl(endpoint);
 
-            if (!response.success || !response.data) {
-                throw new Error(response.message || 'Erro ao atualizar produto');
+            console.log('📝 [ProductService] Atualizando produto:', productId);
+
+            const response = await fetchWithTimeout(url, {
+                method: 'PUT',
+                headers: getAuthHeaders(token),
+                body: JSON.stringify(productData),
+                timeout: API_CONFIG.TIMEOUT,
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw {
+                    statusCode: response.status,
+                    message: errorData.message || `Erro ${response.status}: ${response.statusText}`,
+                    error: errorData.error || 'API_ERROR'
+                };
             }
 
-            console.log('Produto atualizado com sucesso');
-            return response.data;
-        } catch (error) {
-            console.error('Erro ao atualizar produto:', error);
-            throw error;
+            const data: ApiResponse<Product> = await response.json();
+
+            if (!data.success || !data.data) {
+                throw {
+                    statusCode: 500,
+                    message: 'Resposta inválida da API',
+                    error: 'INVALID_RESPONSE'
+                };
+            }
+
+            console.log('✅ [ProductService] Produto atualizado:', data.data.id);
+            return data.data;
+
+        } catch (error: any) {
+            console.error('❌ [ProductService] Erro ao atualizar produto:', error);
+            throw {
+                statusCode: error.statusCode || 0,
+                message: error.message || 'Erro de conexão',
+                error: error.error || 'NETWORK_ERROR'
+            };
         }
     }
 
+    /**
+     * Atualizar produto (dono da loja)
+     */
+    async updateProductAsStoreAdmin(
+        storeSlug: string,
+        productId: string,
+        productData: ProductUpdateData,
+        token: string
+    ): Promise<Product> {
+        try {
+            const endpoint = API_CONFIG.ENDPOINTS.COLLECTIONS.UPDATE_STORE(storeSlug, productId);
+            const url = getApiUrl(endpoint);
+
+            console.log('📝 [ProductService] Atualizando produto (store admin):', productId);
+
+            const response = await fetchWithTimeout(url, {
+                method: 'PUT',
+                headers: getAuthHeaders(token),
+                body: JSON.stringify(productData),
+                timeout: API_CONFIG.TIMEOUT,
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw {
+                    statusCode: response.status,
+                    message: errorData.message || `Erro ${response.status}: ${response.statusText}`,
+                    error: errorData.error || 'API_ERROR'
+                };
+            }
+
+            const data: ApiResponse<Product> = await response.json();
+
+            if (!data.success || !data.data) {
+                throw {
+                    statusCode: 500,
+                    message: 'Resposta inválida da API',
+                    error: 'INVALID_RESPONSE'
+                };
+            }
+
+            console.log('✅ [ProductService] Produto atualizado (store admin):', data.data.id);
+            return data.data;
+
+        } catch (error: any) {
+            console.error('❌ [ProductService] Erro ao atualizar produto (store admin):', error);
+            throw {
+                statusCode: error.statusCode || 0,
+                message: error.message || 'Erro de conexão',
+                error: error.error || 'NETWORK_ERROR'
+            };
+        }
+    }
+
+    /**
+     * Deletar produto (admin da plataforma)
+     */
     async deleteProduct(storeSlug: string, productId: string, token: string): Promise<void> {
-        console.log('Deletando produto:', productId);
-
         try {
-            const endpoint = `${API_CONFIG.ENDPOINTS.COLLECTIONS.CREATE_PLATFORM(storeSlug)}/${productId}`;
-            const response = await apiService.delete(endpoint, token);
+            const endpoint = API_CONFIG.ENDPOINTS.COLLECTIONS.DELETE_PLATFORM(storeSlug, productId);
+            const url = getApiUrl(endpoint);
 
-            if (!response.success) {
-                throw new Error(response.message || 'Erro ao deletar produto');
+            console.log('🗑️ [ProductService] Deletando produto:', productId);
+
+            const response = await fetchWithTimeout(url, {
+                method: 'DELETE',
+                headers: getAuthHeaders(token),
+                timeout: API_CONFIG.TIMEOUT,
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw {
+                    statusCode: response.status,
+                    message: errorData.message || `Erro ${response.status}: ${response.statusText}`,
+                    error: errorData.error || 'API_ERROR'
+                };
             }
 
-            console.log('Produto deletado com sucesso');
-        } catch (error) {
-            console.error('Erro ao deletar produto:', error);
-            throw error;
+            console.log('✅ [ProductService] Produto deletado:', productId);
+
+        } catch (error: any) {
+            console.error('❌ [ProductService] Erro ao deletar produto:', error);
+            throw {
+                statusCode: error.statusCode || 0,
+                message: error.message || 'Erro de conexão',
+                error: error.error || 'NETWORK_ERROR'
+            };
         }
     }
 
-    async toggleProductStatus(
-        storeSlug: string,
-        productId: string,
-        isActive: boolean,
-        token: string
-    ): Promise<Product> {
-        console.log('Alterando status do produto:', productId, isActive);
-
+    /**
+     * Deletar produto (dono da loja)
+     */
+    async deleteProductAsStoreAdmin(storeSlug: string, productId: string, token: string): Promise<void> {
         try {
-            return await this.updateProduct(storeSlug, productId, { isActive }, token);
-        } catch (error) {
-            console.error('Erro ao alterar status:', error);
-            throw error;
+            const endpoint = API_CONFIG.ENDPOINTS.COLLECTIONS.DELETE_STORE(storeSlug, productId);
+            const url = getApiUrl(endpoint);
+
+            console.log('🗑️ [ProductService] Deletando produto (store admin):', productId);
+
+            const response = await fetchWithTimeout(url, {
+                method: 'DELETE',
+                headers: getAuthHeaders(token),
+                timeout: API_CONFIG.TIMEOUT,
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw {
+                    statusCode: response.status,
+                    message: errorData.message || `Erro ${response.status}: ${response.statusText}`,
+                    error: errorData.error || 'API_ERROR'
+                };
+            }
+
+            console.log('✅ [ProductService] Produto deletado (store admin):', productId);
+
+        } catch (error: any) {
+            console.error('❌ [ProductService] Erro ao deletar produto (store admin):', error);
+            throw {
+                statusCode: error.statusCode || 0,
+                message: error.message || 'Erro de conexão',
+                error: error.error || 'NETWORK_ERROR'
+            };
         }
     }
 
-    async toggleFeaturedStatus(
+    /**
+     * Buscar produtos por coleção
+     */
+    async getProductsByCollection(
         storeSlug: string,
-        productId: string,
-        featured: boolean,
-        token: string
-    ): Promise<Product> {
-        console.log('Alterando destaque do produto:', productId, featured);
-
-        try {
-            return await this.updateProduct(storeSlug, productId, { featured }, token);
-        } catch (error) {
-            console.error('Erro ao alterar destaque:', error);
-            throw error;
-        }
-    }
-
-    async updateProductStock(
-        storeSlug: string,
-        productId: string,
-        stockData: {
-            storageP?: number;
-            storageM?: number;
-            storageG?: number;
-            storageU?: number;
-            storageChild?: number;
-            storagePP?: number;
-            storageGG?: number;
-            storageEXG?: number;
-        },
-        token: string
-    ): Promise<Product> {
-        console.log('Atualizando estoque do produto:', productId);
-
-        try {
-            return await this.updateProduct(storeSlug, productId, stockData, token);
-        } catch (error) {
-            console.error('Erro ao atualizar estoque:', error);
-            throw error;
-        }
-    }
-
-    async searchProducts(
-        storeSlug: string,
-        searchTerm: string,
-        filters?: {
-            collectionKey?: string;
-            isActive?: boolean;
-            featured?: boolean;
-            minPrice?: number;
-            maxPrice?: number;
-            tags?: string[];
-        },
+        collectionKey: CollectionKey,
+        params: Omit<GetProductsParams, 'collectionKey'> = {},
         token?: string
-    ): Promise<Product[]> {
-        console.log('Pesquisando produtos:', searchTerm);
+    ): Promise<ProductListResponse> {
+        return this.getProducts(storeSlug, { ...params, collectionKey }, token);
+    }
 
-        try {
-            const response = await this.getProducts(
-                storeSlug,
-                {
-                    search: searchTerm,
-                    collectionKey: filters?.collectionKey,
-                    isActive: filters?.isActive,
-                    featured: filters?.featured,
-                },
-                token
-            );
+    /**
+     * Buscar produtos em destaque
+     */
+    async getFeaturedProducts(
+        storeSlug: string,
+        params: Omit<GetProductsParams, 'featured'> = {},
+        token?: string
+    ): Promise<ProductListResponse> {
+        return this.getProducts(storeSlug, { ...params, featured: true }, token);
+    }
 
-            let products = response.items;
+    /**
+     * Buscar produtos por tags
+     */
+    async getProductsByTags(
+        storeSlug: string,
+        tags: string[],
+        params: Omit<GetProductsParams, 'tags'> = {},
+        token?: string
+    ): Promise<ProductListResponse> {
+        return this.getProducts(storeSlug, { ...params, tags }, token);
+    }
 
-            // Aplicar filtros adicionais que a API não suporta
-            if (filters?.minPrice !== undefined) {
-                products = products.filter(p => p.price >= filters.minPrice!);
-            }
-            if (filters?.maxPrice !== undefined) {
-                products = products.filter(p => p.price <= filters.maxPrice!);
-            }
-            if (filters?.tags && filters.tags.length > 0) {
-                products = products.filter(p =>
-                    filters.tags!.some(tag =>
-                        p.tag.some(productTag =>
-                            productTag.toLowerCase().includes(tag.toLowerCase())
-                        )
-                    )
-                );
-            }
+    /**
+     * Validar dados do produto antes de enviar
+     */
+    private validateProductData(productData: ProductData | ProductUpdateData): void {
+        if ('name' in productData && !productData.name?.trim()) {
+            throw new Error('Nome do produto é obrigatório');
+        }
 
-            console.log('Produtos encontrados na pesquisa:', products.length);
-            return products;
-        } catch (error) {
-            console.error('Erro na pesquisa:', error);
-            throw error;
+        if ('price' in productData && (productData.price === undefined || productData.price <= 0)) {
+            throw new Error('Preço deve ser maior que zero');
+        }
+
+        if ('discount' in productData && productData.discount && (productData.discount < 0 || productData.discount > 100)) {
+            throw new Error('Desconto deve estar entre 0 e 100%');
+        }
+
+        if ('imageList' in productData && (!productData.imageList || productData.imageList.length === 0)) {
+            throw new Error('Pelo menos uma imagem é obrigatória');
         }
     }
 
-    // Utilitários para formatação (mantidos)
-    formatPrice(price: number): string {
-        return new Intl.NumberFormat('pt-BR', {
-            style: 'currency',
-            currency: 'BRL'
-        }).format(price);
+    /**
+     * Helper para determinar qual endpoint usar baseado no role do usuário
+     */
+    getCreateMethod(userRole: string): 'platform' | 'store' {
+        return userRole === 'PVMO_ADMIN' ? 'platform' : 'store';
     }
 
-    calculateDiscountedPrice(price: number, discount: number): number {
-        return price - (price * discount / 100);
+    /**
+     * Método unificado para criar produto baseado no role
+     */
+    async createProductSmart(
+        storeSlug: string,
+        productData: ProductData,
+        token: string,
+        userRole: string
+    ): Promise<Product> {
+        this.validateProductData(productData);
+
+        const method = this.getCreateMethod(userRole);
+
+        if (method === 'platform') {
+            return this.createProduct(storeSlug, productData, token);
+        } else {
+            return this.createProductAsStoreAdmin(storeSlug, productData, token);
+        }
     }
 
-    formatDiscountedPrice(price: number, discount: number): string {
-        const discountedPrice = this.calculateDiscountedPrice(price, discount);
-        return this.formatPrice(discountedPrice);
+    /**
+     * Método unificado para atualizar produto baseado no role
+     */
+    async updateProductSmart(
+        storeSlug: string,
+        productId: string,
+        productData: ProductUpdateData,
+        token: string,
+        userRole: string
+    ): Promise<Product> {
+        this.validateProductData(productData);
+
+        const method = this.getCreateMethod(userRole);
+
+        if (method === 'platform') {
+            return this.updateProduct(storeSlug, productId, productData, token);
+        } else {
+            return this.updateProductAsStoreAdmin(storeSlug, productId, productData, token);
+        }
     }
 
-    getTotalStock(product: Product): number {
-        return (product.storageP || 0) +
-            (product.storageM || 0) +
-            (product.storageG || 0) +
-            (product.storageU || 0) +
-            (product.storageChild || 0) +
-            (product.storagePP || 0) +
-            (product.storageGG || 0) +
-            (product.storageEXG || 0);
-    }
+    /**
+     * Método unificado para deletar produto baseado no role
+     */
+    async deleteProductSmart(
+        storeSlug: string,
+        productId: string,
+        token: string,
+        userRole: string
+    ): Promise<void> {
+        const method = this.getCreateMethod(userRole);
 
-    getStockBySize(product: Product): { [size: string]: number } {
-        return {
-            'PP': product.storagePP || 0,
-            'P': product.storageP || 0,
-            'M': product.storageM || 0,
-            'G': product.storageG || 0,
-            'GG': product.storageGG || 0,
-            'EXG': product.storageEXG || 0,
-            'U': product.storageU || 0,
-            'Infantil': product.storageChild || 0,
-        };
-    }
-
-    isLowStock(product: Product, threshold: number = 5): boolean {
-        return this.getTotalStock(product) <= threshold;
-    }
-
-    isOutOfStock(product: Product): boolean {
-        return this.getTotalStock(product) === 0;
+        if (method === 'platform') {
+            return this.deleteProduct(storeSlug, productId, token);
+        } else {
+            return this.deleteProductAsStoreAdmin(storeSlug, productId, token);
+        }
     }
 }
 
